@@ -65,6 +65,34 @@ def test_stacking_does_not_change_rtp():
     assert abs(flat - stacked) < 1e-12, (flat, stacked)
 
 
+def test_hit_rate_depends_on_the_paylines_given():
+    """Passing different paylines must change the enumerated statistics.
+
+    Regression test. evaluate() used to take a line *count* and silently
+    enumerate against the default 30-line set, so a 20-line game was measured
+    over the wrong paylines. RTP is invariant to the line count, so it kept
+    agreeing and hid the fault; only the hit rate exposes it.
+    """
+    cfg = GameConfig.load(CONFIGS[0])
+    few = PAYLINES[:5]
+    a = evaluate(cfg, lines=PAYLINES, hit_rate=True, max_windows=4_000_000)
+    b = evaluate(cfg, lines=few, hit_rate=True, max_windows=4_000_000)
+    assert a["lines"] == 30 and b["lines"] == 5
+    assert b["any_win_rate"] < a["any_win_rate"], "fewer paylines must win less often"
+    # RTP is line-count invariant, which is exactly why it could not catch this.
+    assert abs(a["rtp_total"] - b["rtp_total"]) < 1e-9
+
+
+def test_evaluate_rejects_a_line_count():
+    """A bare integer is the mistake this API used to invite."""
+    cfg = GameConfig.load(CONFIGS[0])
+    try:
+        evaluate(cfg, lines=30)
+    except TypeError:
+        return
+    raise AssertionError("evaluate() should reject an int for lines")
+
+
 def test_wild_substitution():
     cfg = GameConfig.load(CONFIGS[0])
     # Five wilds should pay the best available five-of-a-kind.

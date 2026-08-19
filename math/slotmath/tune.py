@@ -58,6 +58,7 @@ def tune(
     target_trigger: tuple[float, float] = (0.004, 0.012),
     target_line_hit: tuple[float, float] | None = None,
     stacks: dict[str, int] | None = None,
+    lines=None,
     mins: dict[str, int] | None = None,
     maxs: dict[str, int] | None = None,
     iterations: int = 600,
@@ -68,7 +69,7 @@ def tune(
     mins = mins or {}
     maxs = maxs or {}
     cur = [dict(c) for c in counts]
-    cur_res = evaluate(_cfg_from_counts(base, cur, stacks))
+    cur_res = evaluate(_cfg_from_counts(base, cur, stacks), **({"lines": lines} if lines else {}))
     cur_cost = objective(cur_res, target_rtp, target_trigger, target_line_hit)
 
     for it in range(iterations):
@@ -86,7 +87,7 @@ def tune(
         cand[r][src] -= 1
         cand[r][dst] = cand[r].get(dst, 0) + 1
         try:
-            res = evaluate(_cfg_from_counts(base, cand, stacks))
+            res = evaluate(_cfg_from_counts(base, cand, stacks), **({"lines": lines} if lines else {}))
         except Exception:
             continue
         cost = objective(res, target_rtp, target_trigger, target_line_hit)

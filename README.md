@@ -23,16 +23,22 @@ path (Construct 3 imports Construct 2 projects).
 
 ## Play it
 
-**Pirate Slots, live:** https://claude.ai/code/artifact/24c0fb37-7050-48bd-81e6-26e9f1e64519
+- **Pirate Slots:** https://claude.ai/code/artifact/24c0fb37-7050-48bd-81e6-26e9f1e64519
+- **Santa Slots:** https://claude.ai/code/artifact/aa8db3cb-2e88-4491-8d7b-e9b5e95348f2
+  (placeholder symbols — its artwork and audio are still in Dropbox)
 
-The original artwork from the APK, running on the solved 40-position strips. It
-reports its own RTP as you play and converges on the verified 94.00%. Built by
-`build_web.py` from `math/pirates/config/pirates-v3.json`, so the reels and
-paytable are the same data the Python model verifies — the page cannot drift
-from the measured figures without the build changing.
+Both are built by `build_web.py` from the solved configs, so the reels, paytable
+and paylines are the same data the Python model verifies and a page cannot drift
+from the measured figures without the build changing. Pirate Slots carries the
+original artwork and all six sound effects from the APK; Santa Slots is still on
+placeholders.
 
-Checked against the model over 3,000,000 spins in Node: the page returns 93.93%
-against a computed 94.00%, with an any-win rate of 49.01% against 48.98%.
+Each build is checked by replaying its own JavaScript over millions of spins and
+comparing against the model. That check is not ceremony: it is what caught the
+payline bug described under Santa Slots below.
+
+    python3 build_web.py            # both games
+    python3 build_web.py santa      # one game
 
 ### Hosting it
 
@@ -216,10 +222,20 @@ frequency changes.
 | metric | as shipped | solved |
 |---|---|---|
 | RTP | 47.47% | **94.00%** |
-| any-win rate | 18.62% | 40.22% |
-| net-win rate | 11.24% | 19.29% |
-| LDW rate | 7.39% | 20.93% |
-| max win | 285x | **5000x** |
+| any-win rate | 15.34% | 34.36% |
+| net-win rate | 10.23% | 18.11% |
+| LDW rate | 5.11% | 16.26% |
+| max win | 512x | **5000x** |
+
+An earlier revision of this table reported 40.22% / 19.29% / 20.93% / 285x for
+the solved column. Those were wrong: `evaluate()` took a line *count* and
+enumerated against the default 30-line set, so Santa's 20-line game was measured
+over Pirate Slots' paylines. RTP is invariant to the line count, so it kept
+agreeing and hid the fault — the figure used as the cross-check was the one
+metric incapable of catching it. Caught by replaying the built page's own
+JavaScript, which disagreed by six points. Pirate Slots was unaffected, since it
+uses the 30-line default. `evaluate()` now takes the payline list and rejects an
+int, with two regression tests.
 
 Both figures are exact — the solved config is enumerated over all 40^5 =
 102,400,000 windows, not sampled.

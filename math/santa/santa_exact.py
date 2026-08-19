@@ -34,7 +34,7 @@ PAYLINES = [
 N_SYMBOLS = 14
 
 
-def load_paytable(path=HERE / "prizes.xml"):
+def load_paytable(path=HERE / "source" / "prizes.xml"):
     table: dict[str, dict[int, float]] = {}
     for card in ET.parse(path).getroot().findall("card"):
         table.setdefault(f"card{card.get('id')}", {})[int(card.get("lv"))] = float(card.text)
@@ -55,7 +55,7 @@ def build(paytable) -> GameConfig:
 
 
 def show(label, cfg, lines):
-    r = evaluate(cfg, lines=len(lines), hit_rate=True)
+    r = evaluate(cfg, lines=lines, hit_rate=True)
     print(f"\n--- {label} ---")
     print(f"  RTP                 {r['rtp_total']*100:8.2f}%")
     print(f"    (enumerated check {r['rtp_enumerated']*100:8.2f}%)")

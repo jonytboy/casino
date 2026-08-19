@@ -102,13 +102,24 @@ def scatter_count_dist(cfg: GameConfig) -> dict[int, float]:
     return dist
 
 
-def evaluate(cfg: GameConfig, lines: int = len(PAYLINES), hit_rate: bool = False,
+def evaluate(cfg: GameConfig, lines=PAYLINES, hit_rate: bool = False,
              max_windows: int | None = 8_000_000) -> dict:
-    """Full exact evaluation. RTP is returned as a fraction (0.94 = 94%)."""
+    """Full exact evaluation. RTP is returned as a fraction (0.94 = 94%).
+
+    `lines` is the payline list, not a count. It must be the list, because the
+    enumerated statistics below depend on which cells each line reads, not just
+    how many lines there are. RTP happens to be invariant to the line count --
+    every line shares one expectation and the stake scales with them -- so
+    passing the wrong lines still yields the right RTP, which makes that the one
+    figure incapable of catching a mistake here.
+    """
+    if isinstance(lines, int):
+        raise TypeError("evaluate(lines=...) takes the payline list, not a count")
     ls = line_stats(cfg)
 
     # Total bet = lines * bet_per_line, and every line shares one expectation,
     # so total line RTP equals the single-line expectation in bet-per-line units.
+    n_lines = len(lines)
     rtp_lines = ls["ev"]
 
     dist = scatter_count_dist(cfg)
@@ -126,8 +137,8 @@ def evaluate(cfg: GameConfig, lines: int = len(PAYLINES), hit_rate: bool = False
         "volatility_index": ls["var"] ** 0.5,
         "scatter_trigger_rate": scatter_trigger,
         "scatter_dist": dist,
-        "lines": lines,
-        **(exact_spin_stats(cfg, max_windows=max_windows) if hit_rate else {}),
+        "lines": n_lines,
+        **(exact_spin_stats(cfg, lines, max_windows=max_windows) if hit_rate else {}),
     }
 
 

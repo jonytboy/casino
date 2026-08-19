@@ -55,9 +55,9 @@ counts, cfg, _ = tune(base, counts, target_rtp=0.94,
                       target_line_hit=(0.050, 0.070), stacks=STACKS,
                       mins=MINS, maxs=MAXS, iterations=4000, verbose=False)
 
-before = evaluate(base, lines=len(PAYLINES), hit_rate=True)
+before = evaluate(base, lines=PAYLINES, hit_rate=True)
 print("\nenumerating 102,400,000 windows for exact stats (slow)...")
-after = evaluate(cfg, lines=len(PAYLINES), hit_rate=True, max_windows=None)
+after = evaluate(cfg, lines=PAYLINES, hit_rate=True, max_windows=None)
 
 print(f"\n{'metric':26} {'as shipped':>14} {'solved':>14}")
 print("-" * 56)
