@@ -34,6 +34,24 @@ from the measured figures without the build changing.
 Checked against the model over 3,000,000 spins in Node: the page returns 93.93%
 against a computed 94.00%, with an any-win rate of 49.01% against 48.98%.
 
+### Hosting it
+
+`docs/index.html` is the built page, kept byte-identical to
+`web/pirates-slot.html` by `build_web.py`. To serve it from this repo:
+**Settings → Pages → Source: Deploy from a branch → `main` / `/docs`**. The URL
+is then `https://jonytboy.github.io/casino/`.
+
+Two things to know before flipping that switch. GitHub Pages on a *private*
+repo needs a paid plan; on a free plan the repo has to be public, which would
+publish the analysis and commit history alongside the game. And the page embeds
+the artwork as data URIs, so anyone with the URL can extract the symbol PNGs and
+the audio — worth weighing, since the art is the asset actually worth something
+here.
+
+The page is a single self-contained file with no build step or external
+requests, so any static host works equally well: drag `docs/index.html` onto
+Netlify Drop, a Cloudflare Pages project, or any web server.
+
 ## The problem both games share
 
 Neither game has a defined RTP. Both pick symbols with a uniform random call and
