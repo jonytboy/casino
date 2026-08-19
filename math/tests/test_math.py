@@ -16,8 +16,15 @@ from slotmath.simulate import simulate
 from slotmath.strips import build_strip, max_run
 
 _ROOT = Path(__file__).resolve().parents[1]
-CONFIGS = sorted(list((_ROOT / "pirates" / "config").glob("*.json"))
-                 + list((_ROOT / "santa" / "config").glob("*.json")))
+_ALL = sorted(list((_ROOT / "pirates" / "config").glob("*.json"))
+              + list((_ROOT / "santa" / "config").glob("*.json")))
+
+# Configs recovered from the shipped games are historical records, not designs:
+# they are allowed to be broken, and two of them pay over 100%. Only the solved
+# configs are held to a publishable standard.
+AS_SHIPPED = [p for p in _ALL if "as-shipped" in p.name]
+SOLVED = [p for p in _ALL if p not in AS_SHIPPED]
+CONFIGS = _ALL
 
 
 def test_paylines_wellformed():
@@ -115,12 +122,35 @@ def test_leftmost_nonwild_rule():
 
 
 def test_wild_substitution():
-    cfg = GameConfig.load(CONFIGS[0])
-    # Five wilds should pay the best available five-of-a-kind.
-    best5 = max(cfg.paytable[s].get(5, 0) for s in cfg.paying_symbols)
-    assert line_win_multiplier(cfg, ("Wild",) * 5) == best5
+    """Wild behaviour under the 'best' rule, on a config built for the purpose.
+
+    This used to load CONFIGS[0] and assume it used the "best" rule. Adding a
+    config whose name sorted earlier silently changed what the test measured —
+    so it now builds its own fixture rather than depending on glob order.
+    """
+    from slotmath.model import GameConfig
+    pt = {"low": {3: 5, 4: 20, 5: 100}, "high": {3: 100, 4: 200, 5: 400}}
+    syms = ["low", "high", "Wild", "Bonus"]
+    cfg = GameConfig(name="t", symbols=syms, wild="Wild", scatter="Bonus",
+                     paytable=pt, scatter_pays={}, scatter_spins={},
+                     reels=[syms] * 5, rule="best")
+    # Five wilds pay the best available five-of-a-kind.
+    assert line_win_multiplier(cfg, ("Wild",) * 5) == 400
     # A wild must not complete the scatter.
     assert line_win_multiplier(cfg, ("Bonus", "Wild", "Wild", "Wild", "Wild")) == 0
+    # And it does substitute for an ordinary symbol.
+    assert line_win_multiplier(cfg, ("low", "Wild", "low", "Wild", "low")) == 100
+
+
+def test_as_shipped_configs_pay_over_100_percent():
+    """Both shipped games over-paid; that is the project's central finding.
+
+    Pinned so the recovered strips and paytables cannot drift unnoticed.
+    """
+    assert AS_SHIPPED, "no as-shipped configs found"
+    for path in AS_SHIPPED:
+        rtp = evaluate(GameConfig.load(path))["rtp_total"]
+        assert rtp > 1.0, f"{path.name} reads {rtp:.4f}, expected over 100%"
 
 
 def test_configs_valid():
@@ -174,8 +204,9 @@ def test_simulation_matches_exact():
 
 
 def test_rtp_in_publishable_band():
-    """Tuned configs should sit in the range operators and stores expect."""
-    for path in CONFIGS:
+    """Solved configs should sit in the range operators and stores expect."""
+    assert SOLVED, "no solved configs found"
+    for path in SOLVED:
         cfg = GameConfig.load(path)
         rtp = evaluate(cfg)["rtp_total"]
         assert 0.80 <= rtp <= 0.99, f"{path.name} RTP {rtp:.4f} outside sane band"
