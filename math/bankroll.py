@@ -23,7 +23,10 @@ from slotmath.model import GameConfig
 from slotmath.paylines import PAYLINES as PIRATE
 from slotmath.simulate import spin_window
 
-BANK, BET, CAP = 10_000, 2, 200_000
+# A game paying over 100% drifts upward, so most sessions never end. The cap
+# keeps those runs finite; what matters is the fraction that never went broke,
+# not a precise median for a game that cannot reliably bust.
+BANK, BET, CAP = 10_000, 2, 25_000
 
 
 def spins_to_bust(cfg, lines, rng):
@@ -49,12 +52,12 @@ CASES = [
     ("Pirates — solved (94.00%)", GameConfig.load("pirates/config/pirates-v3.json"), PIRATE),
 ]
 
-print(f"bank {BANK:,} credits, {BET} per line\n")
+print(f"bank {BANK:,} credits, {BET} per line, capped at {CAP:,} spins\n")
 print(f"{'game':32}{'median spins to broke':>24}{'never broke':>14}")
 print("-" * 70)
 for label, cfg, lines in CASES:
     rng = random.Random(99)
-    runs = [spins_to_bust(cfg, lines, rng) for _ in range(120)]
+    runs = [spins_to_bust(cfg, lines, rng) for _ in range(80)]
     busts = [r for r in runs if r is not None]
     never = len(runs) - len(busts)
     med = f"{statistics.median(busts):,.0f}" if busts else "—"

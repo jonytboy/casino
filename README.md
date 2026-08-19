@@ -104,16 +104,20 @@ that prompt never fires.
 
 `math/bankroll.py` measures it. Starting with 10,000 credits at 2 per line:
 
-| game | median spins to broke | runs that never went broke |
-|---|---|---|
-| Santa — as shipped (229.60%) | never | **120 / 120** |
-| Santa — solved (94.00%) | 1,747 | 0 / 120 |
-| Pirates — solved (94.00%) | 1,470 | 0 / 120 |
+80 sessions per game, capped at 25,000 spins:
 
-Not one simulated player ran out of credits in the shipped game. The reward-video
-loop could not fire, which is a plausible large part of why the portfolio never
-earned. Solving to 94% gives roughly 1,500-1,750 spins of runway before the
-first ask — long enough to be enjoyed, finite enough to monetise.
+| game | median spins to broke | never went broke |
+|---|---|---|
+| Pirates — as shipped (103.66%) | 5,158 | **79 / 80** |
+| Santa — as shipped (229.60%) | never | **80 / 80** |
+| Santa — solved (94.00%) | 1,689 | 3 / 80 |
+| Pirates — solved (94.00%) | 1,574 | 0 / 80 |
+
+As shipped, almost no simulated player ever ran out of credits — none at all in
+Santa Slots. The prompt that drives rewarded video could not fire, which is a
+plausible large part of why a portfolio with the ad SDKs already wired in never
+earned. Solved to 94%, the same bank lasts a median 1,574-1,689 spins: long
+enough to enjoy, finite enough to monetise.
 
 An undefined RTP blocks every commercial route: you cannot state your odds to a
 store, tune monetisation against it, or license the content to an operator.
