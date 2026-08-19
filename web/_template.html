@@ -100,6 +100,13 @@
   button:hover:not(:disabled) { filter: brightness(1.25); }
   button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   button:disabled { opacity: .45; cursor: not-allowed; }
+  .mute {
+    padding: 0; border: none; background: none; line-height: 0;
+    border-radius: 7px; align-self: center;
+  }
+  .mute img { width: 46px; height: auto; display: block; transition: filter .15s; }
+  .mute:hover img { filter: brightness(1.3); }
+  .mute:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   .spin {
     margin-left: auto; font-family: Cinzel, Georgia, serif; font-weight: 600;
     letter-spacing: .14em; text-transform: uppercase; font-size: 1rem;
@@ -167,6 +174,7 @@
           <span class="label">Last win</span>
           <span class="value win" id="lastwin">0</span>
         </div>
+        <button class="mute" id="mute" aria-pressed="true" aria-label="Mute sound"><img id="muteIcon" src="" alt=""></button>
         <button class="spin" id="spin">Spin</button>
       </div>
     </div>
@@ -251,6 +259,36 @@ function evaluate(win, betPerLine) {
     total: lineTotal * betPerLine + scatterMult * betPerLine * LINES.length,
     lit, scatters, freeSpins: CFG.scatter_spins[scatters] || 0
   };
+}
+
+const SFX = __SOUNDS__;
+const ICONS = __ICONS__;
+
+/* The original preloaded six effects and looped finsihedspin while the reels
+   turned. Same mapping here. Every sound is triggered by a click, so the
+   browser's autoplay gate is never an issue. */
+const LEVELS = {spin: 0.32, won: 0.6, coin: 0.5, chest: 0.65, nudge: 0.4, warning: 0.45};
+const AUDIO = {};
+for (const [name, src] of Object.entries(SFX)) {
+  const a = new Audio(src);
+  a.preload = "auto"; a.volume = LEVELS[name] ?? 0.5;
+  AUDIO[name] = a;
+}
+let soundOn = true;
+
+function play(name, loop) {
+  if (!soundOn) return;
+  const base = AUDIO[name];
+  if (!base) return;
+  if (loop) { base.loop = true; base.currentTime = 0; base.play().catch(() => {}); return; }
+  // Clone so overlapping effects do not cut each other off.
+  const one = base.cloneNode();
+  one.volume = base.volume;
+  one.play().catch(() => {});
+}
+function stopSound(name) {
+  const a = AUDIO[name];
+  if (a) { a.pause(); a.loop = false; a.currentTime = 0; }
 }
 
 const $ = id => document.getElementById(id);
@@ -353,7 +391,10 @@ function refresh() {
     ? "Short sessions swing wildly. Expect a few thousand spins before your figure settles near the verified one."
     : "After " + fmt(spins) + " spins you are " + (rtp >= 94 ? "above" : "below") + " the verified 94.00%, by "
       + Math.abs(rtp - 94).toFixed(2) + " points.";
-  $("spin").disabled = busy || credits < stake;
+  const broke = credits < stake;
+  if (broke && spins > 0 && !refresh.warned) { refresh.warned = true; play("warning"); }
+  if (!broke) refresh.warned = false;
+  $("spin").disabled = busy || broke;
   $("auto").disabled = busy || credits < stake;
   $("down").disabled = busy || betIdx === 0;
   $("up").disabled = busy || betIdx === BETS.length - 1;
@@ -365,6 +406,8 @@ function settle(win, res, stake) {
   if (res.freeSpins) bonus++;
   highlight(res.lit);
   $("lastwin").textContent = fmt(res.total);
+  if (res.freeSpins) play("chest");
+  else if (res.total > 0) { play("won"); setTimeout(() => play("coin"), 260); }
   const b = $("banner");
   if (res.freeSpins) { b.textContent = res.scatters + " Bonus — " + fmt(res.total) + " and " + res.freeSpins + " free spins"; b.classList.add("show"); }
   else if (res.total >= stake * 10) { b.textContent = "Big win — " + fmt(res.total); b.classList.add("show"); }
@@ -380,12 +423,28 @@ function doSpin() {
   const win = spinWindow(), res = evaluate(win, bet);
   busy = true; refresh();
   $("banner").classList.remove("show");
-  animateReels(win).then(() => { busy = false; settle(win, res, stake); });
+  play("spin", true);
+  animateReels(win).then(() => {
+    stopSound("spin");
+    busy = false;
+    settle(win, res, stake);
+  });
 }
 
 $("spin").addEventListener("click", () => doSpin());
-$("down").addEventListener("click", () => { if (betIdx > 0) betIdx--; refresh(); });
-$("up").addEventListener("click", () => { if (betIdx < BETS.length - 1) betIdx++; refresh(); });
+$("down").addEventListener("click", () => { if (betIdx > 0) { betIdx--; play("nudge"); } refresh(); });
+$("up").addEventListener("click", () => { if (betIdx < BETS.length - 1) { betIdx++; play("nudge"); } refresh(); });
+function paintMute() {
+  $("muteIcon").src = soundOn ? ICONS.on : ICONS.off;
+  $("mute").setAttribute("aria-pressed", String(soundOn));
+  $("mute").setAttribute("aria-label", soundOn ? "Mute sound" : "Unmute sound");
+}
+$("mute").addEventListener("click", () => {
+  soundOn = !soundOn;
+  if (!soundOn) stopSound("spin"); else play("nudge");
+  paintMute();
+});
+
 $("reset").addEventListener("click", () => {
   credits = 10000; spins = staked = returned = best = bonus = 0;
   $("lastwin").textContent = "0"; $("banner").classList.remove("show"); refresh();
@@ -402,6 +461,7 @@ $("auto").addEventListener("click", () => {
     last = res; lastWin = w;
   }
   if (lastWin) { paint(lastWin, last.lit); $("lastwin").textContent = fmt(last.total); }
+  play("coin");
   refresh();
 });
 
@@ -414,6 +474,7 @@ rows.push(`<tr><td><img src="${ART[CFG.scatter]}" alt=""> Bonus (anywhere)</td><
 $("paytable").innerHTML = rows.join("");
 
 sizeReels();
+paintMute();
 paint(spinWindow(), []);
 refresh();
 addEventListener("resize", () => {
