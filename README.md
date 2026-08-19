@@ -171,6 +171,45 @@ uniform reel model from that same file's `floor(random(0,14))`. An earlier
 estimate of ~61% in this repo's history was wrong: it guessed 15 symbols and a
 scatter component that does not exist.
 
+## Account status (Play Console, checked 19 Aug 2026)
+
+Developer account **Exuma Trading LTD** (personal account, 8 apps). Every one of
+the eight reads **Removed by Google**, and the installed audience is 0 on all of
+them bar one.
+
+| app | package | status | last updated |
+|---|---|---|---|
+| Casino Pirates Vegas Slots | `com.jonty.caribbeanslots` | Removed by Google | 9 Nov 2021 |
+| Santa Slots Christmas Casino | `com.tigamedev.santaslots` | Removed by Google | 9 Nov 2021 |
+| Santa Slot Xmas Slot Machine | `com.tigamedev.santaslotspaid` | Removed by Google | 9 Nov 2021 |
+| Casino Vegas Roulette | `com.xo.roulette` | Removed, **app rejected** | 4 Jan 2021 |
+| Casino Vegas Roulette Free | `com.xo.roulettefree` | Removed, **app rejected** | 4 Jan 2021 |
+| Beach Hut iManager | `com.app.app44429d9df7dc` | Removed by Google | 30 Sep 2015 |
+| Stock Ordering Form JT Leisure | `com.app.appede3cc882c5d` | Removed by Google | 6 Jan 2016 |
+| Zoom Sunset Shopping | `com.wZoom_8619566` | Removed by Google | 20 Feb 2019 |
+
+What this settles:
+
+- **There is no install base to preserve.** The earlier concern about the
+  third-party signing key blocking an in-place update is moot: with zero
+  installs and every listing removed, nothing is lost by publishing fresh. That
+  removes the keystore hunt from the critical path entirely.
+- **Those package names are burned.** A published package name can never be
+  reused, so any relaunch needs new ones.
+- **Santa shipped under `com.tigamedev`**, not the account holder's own
+  namespace — matching the Pirate Slots APK being signed by a Kolkata agency.
+  Both games were built and published by third parties.
+- **Two roulette apps were rejected outright** in Jan 2021, which is a caution
+  about how the gambling category is reviewed.
+- **Removed by Google is not the same as unpublished by the developer.** The
+  reason matters: it bears on whether the account is in good standing before
+  anything new is submitted. Play Console → Policy status has the detail, and it
+  is the first thing to read.
+
+A second deadline also surfaced, separate from the target API one: **Android
+developer verification**. Unregistered apps stop being installable on certified
+devices in select countries from **September 2026**.
+
 ## Play Store position (checked 19 Aug 2026)
 
 Social casino apps are permitted on Google Play. This was verified against live
