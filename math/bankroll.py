@@ -42,6 +42,8 @@ def spins_to_bust(cfg, lines, rng):
 
 
 CASES = [
+    ("Pirates — as shipped (103.66%)",
+     GameConfig.load("pirates/config/pirates-as-shipped.json"), PIRATE),
     ("Santa — as shipped (229.60%)", build(load_paytable()), SANTA),
     ("Santa — solved (94.00%)", GameConfig.load("santa/config/santa-94.json"), SANTA),
     ("Pirates — solved (94.00%)", GameConfig.load("pirates/config/pirates-v3.json"), PIRATE),

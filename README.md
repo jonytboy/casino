@@ -59,14 +59,30 @@ Netlify Drop, a Cloudflare Pages project, or any web server.
 
 ## The problem both games share
 
-Neither game has a defined RTP. Both pick symbols with a uniform random call and
-no reel strips, so the payout percentage is an emergent side effect of the spin
-code rather than a designed number:
+**Both games shipped paying out more than they took.** That is the finding that
+matters, and it is portfolio-wide.
 
-- **Pirate Slots** — `Math.random()` at ~20 sites across a 4,364-line
-  `GameLayer.java`; the paytable existed only as UI label text.
-- **Santa Slots** — `floor(random(0,14))` per cell, uniform over 15 symbols;
-  the paytable is a separate `prizes.xml`.
+- **Santa Slots** has no reel strips at all: `floor(random(0,14))` fills each
+  cell uniformly from 14 symbols, and card0 — the wild — lands one spin in
+  fourteen on every reel. **229.60%**.
+- **Pirate Slots** *does* have reel strips, hardcoded as five 20-symbol arrays
+  in `checkIfWon()`. Its paytable and win rule are in the same method. **103.66%**.
+
+An earlier version of this file claimed Pirate Slots had no strips and returned
+68.40%. Both were wrong. The `Math.random()` calls drive the spin animation, not
+the symbol layout, and the 68.40% was this project's own invented strips measured
+against the real paytable — a statement about a reconstruction, not about the
+shipped game. The real strips are now committed at
+`math/pirates/config/pirates-as-shipped.json`.
+
+Pirate Slots' rule pays **reel 1's symbol**, with wilds substituting on reels
+2-5 (`r13.indexOf(r22)` where r22 is the first reel). Reel 1 carries no Wild, so
+that is identical to Santa's leftmost-non-wild rule, and identical to the "best
+symbol" rule this project had assumed — the assumption was harmless here, but
+only by luck of the strip design.
+
+The code also confirms the paytable recovered from the in-game paytable screen,
+value for value.
 
 Measured against their own paytables, both pay far under the 92-96% band players
 and stores expect:

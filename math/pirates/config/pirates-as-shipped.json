@@ -1,0 +1,180 @@
+{
+  "name": "Pirate Slots (as shipped)",
+  "symbols": [
+    "J",
+    "Q",
+    "K",
+    "A",
+    "Star",
+    "Diamond",
+    "Lemon",
+    "Seven",
+    "Wild",
+    "Bonus"
+  ],
+  "wild": "Wild",
+  "scatter": "Bonus",
+  "rows": 3,
+  "rule": "leftmost_nonwild",
+  "paytable": {
+    "J": {
+      "2": 2.0,
+      "3": 4.0,
+      "4": 8.0,
+      "5": 16.0
+    },
+    "Q": {
+      "2": 4.0,
+      "3": 8.0,
+      "4": 16.0,
+      "5": 32.0
+    },
+    "K": {
+      "3": 5.0,
+      "4": 10.0,
+      "5": 20.0
+    },
+    "A": {
+      "3": 10.0,
+      "4": 20.0,
+      "5": 40.0
+    },
+    "Star": {
+      "2": 10.0,
+      "3": 30.0,
+      "4": 60.0,
+      "5": 120.0
+    },
+    "Diamond": {
+      "3": 100.0,
+      "4": 200.0,
+      "5": 400.0
+    },
+    "Lemon": {
+      "3": 20.0,
+      "4": 40.0,
+      "5": 80.0
+    },
+    "Seven": {
+      "3": 25.0,
+      "4": 50.0,
+      "5": 100.0
+    }
+  },
+  "scatter_pays": {},
+  "scatter_spins": {
+    "3": 1
+  },
+  "reels": [
+    [
+      "Star",
+      "A",
+      "Lemon",
+      "Diamond",
+      "Q",
+      "Lemon",
+      "J",
+      "K",
+      "K",
+      "Q",
+      "Star",
+      "Lemon",
+      "J",
+      "A",
+      "Star",
+      "Diamond",
+      "Seven",
+      "J",
+      "J",
+      "Seven"
+    ],
+    [
+      "Lemon",
+      "J",
+      "Q",
+      "K",
+      "Diamond",
+      "Seven",
+      "Wild",
+      "K",
+      "Star",
+      "Seven",
+      "Bonus",
+      "A",
+      "Diamond",
+      "J",
+      "Lemon",
+      "Q",
+      "Star",
+      "K",
+      "Star",
+      "J"
+    ],
+    [
+      "Lemon",
+      "Diamond",
+      "K",
+      "Q",
+      "A",
+      "K",
+      "Seven",
+      "Lemon",
+      "J",
+      "Seven",
+      "Star",
+      "A",
+      "Bonus",
+      "Diamond",
+      "Q",
+      "Lemon",
+      "J",
+      "K",
+      "Wild",
+      "J"
+    ],
+    [
+      "Star",
+      "Wild",
+      "J",
+      "A",
+      "Bonus",
+      "Diamond",
+      "Seven",
+      "J",
+      "Star",
+      "J",
+      "Bonus",
+      "Diamond",
+      "K",
+      "Q",
+      "A",
+      "K",
+      "Seven",
+      "Lemon",
+      "K",
+      "Q"
+    ],
+    [
+      "Bonus",
+      "A",
+      "Diamond",
+      "J",
+      "Lemon",
+      "Q",
+      "Star",
+      "K",
+      "Star",
+      "Wild",
+      "Lemon",
+      "J",
+      "Q",
+      "K",
+      "Diamond",
+      "Seven",
+      "A",
+      "Bonus",
+      "Star",
+      "Seven"
+    ]
+  ]
+}
