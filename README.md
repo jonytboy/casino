@@ -38,7 +38,11 @@ and stores expect:
 | game | measured RTP | notes |
 |---|---|---|
 | Pirate Slots | **68.40%** | exact |
-| Santa Slots | **~61%** (36% lines + 25% scatter) | paytable mapping inferred — see below |
+| Santa Slots | **47.47%** | exact, from the shipped `prizes.xml` |
+
+Santa Slots — the game that sold best — returns **47.47%**. A player staking
+£100 gets back about £47. Both games were built to pay roughly half to two
+thirds of what the market expects.
 
 An undefined RTP blocks every commercial route: you cannot state your odds to a
 store, tune monetisation against it, or license the content to an operator.
@@ -66,7 +70,7 @@ Routes 1 and 2 agree to 1e-9; route 3 lands within sampling error.
 pip install numpy
 python3 math/tests/test_math.py                          # 8 tests
 python3 math/pirates/report.py math/pirates/config/pirates-v3.json
-python3 math/santa/santa_estimate.py
+python3 math/santa/santa_exact.py
 ```
 
 See `math/pirates/README.md` for the recovered Pirate Slots paytable and the
@@ -76,24 +80,34 @@ three tuned configs (all solved to 94.00% RTP, differing in feel not in cost).
 
 Read directly from the Construct 2 project via the Dropbox connector.
 
-- **5x3 grid, 20 paylines, 15 symbols**, uniform RNG per cell.
+- **5x3 grid, 20 paylines, 14 symbols** (ids 0-13; only 0-12 pay), uniform
+  RNG per cell — `floor(random(0,14))`.
 - **Line 8 is an exact duplicate of line 3** (both `(0,0,0,0,0)`, the top row).
   This is RTP-neutral, since the player stakes for that line too — but it means
   lines 3 and 8 always win and lose together, which raises variance and wastes a
   payline slot that could have been a distinct pattern.
-- **Top award is 5000x line bet** — far better than Pirate Slots' 400x, and a
-  usable marketing headline.
+- **Top award is 5000x line bet on `card0`** — 285x total bet, against Pirate
+  Slots' 51x. The best headline number in the portfolio.
+- **Four symbols pay from 2 of a kind** (`card0`, `card9`, `card10`, `card11`),
+  but the LDW rate is only 7.4% — far healthier than Pirates' 20.7%, because
+  14 uniform symbols make two-of-a-kind much rarer than Pirates' setup did.
 - Bonus is a pick-a-box awarding `choose(10,15,20,25) * line_bet * lines`.
 - Credits persist in `WebStorage.LocalValue("credits")` — i.e. browser local
   storage, trivially editable by the player. Fine for a paid offline game,
   unacceptable if anything of value is ever attached to the balance.
 
-**Caveat on the ~61% figure:** the Dropbox text extraction strips XML
-attributes, so `prizes.xml` yielded payout values without their `id`/`lv`
-mapping. The symbol-to-payout assignment in `math/santa/santa_estimate.py` is
-inferred from value ordering and is stated in the file. The reel model is *not*
-inferred — the uniform RNG is read directly from `game.xml`, and that is what
-dominates the result. Confirming the mapping needs the raw `prizes.xml`.
+- **`card12`'s paytable is reversed.** It reads 3-of-a-kind = 100, 4 = 10,
+  5 = 3, so a better outcome pays less. Almost certainly the three values were
+  entered backwards. Note the direction of the error: because 3-of-a-kind is far
+  commoner than 5, the bug *over*-pays. Un-reversing it to 3/10/100 drops RTP
+  from 47.47% to 44.21%, so the shipped game is accidentally more generous than
+  intended — correcting it in isolation makes the game worse for the player.
+
+Nothing above is inferred. The paytable comes from `Files/prizes.xml`, the
+paylines from the 20 `checkLine` calls in `Event sheets/game.xml`, and the
+uniform reel model from that same file's `floor(random(0,14))`. An earlier
+estimate of ~61% in this repo's history was wrong: it guessed 15 symbols and a
+scatter component that does not exist.
 
 ## Known blockers
 
@@ -106,6 +120,7 @@ dominates the result. Confirming the mapping needs the raw `prizes.xml`.
 
 ## Next
 
-1. Get the raw `prizes.xml` to confirm the Santa Slots symbol mapping.
-2. Solve Santa Slots reel strips to a target RTP, as already done for Pirates.
+1. Solve Santa Slots reel strips to a target RTP, as already done for Pirates.
+   This means introducing reel strips at all — there are none today.
+2. Sweep the remaining five games' Dropbox folders for unzipped source.
 3. Decide the shipping engine. Santa Slots being Construct 2 argues for HTML5.
