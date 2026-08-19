@@ -1,0 +1,360 @@
+<title>Pirates Slot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Karla:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  /* A slot cabinet commits to one world: brass and seawater, lit from within.
+     Single-theme by choice, so every colour is painted explicitly and the page
+     holds on either host ground. */
+  :root {
+    --abyss:  #0A1D23;
+    --hull:   #103038;
+    --raised: #16414C;
+    --brass:  #C08B3E;
+    --gold:   #F4C860;
+    --rope:   #E3D5BC;
+    --tide:   #4E8A94;
+    --blood:  #A8433F;
+    --frame:  linear-gradient(170deg, #E0B970 0%, #A8752F 38%, #6E4A1C 100%);
+    --step: clamp(0.5rem, 1.4vw, 0.9rem);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #1A4650 0%, transparent 60%),
+      var(--abyss);
+    color: var(--rope);
+    font-family: Karla, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+    padding: clamp(1rem, 3vw, 2.5rem);
+    display: flex; justify-content: center;
+  }
+  .shell { width: min(1080px, 100%); display: flex; flex-direction: column; gap: calc(var(--step) * 2); }
+
+  header { text-align: center; display: flex; flex-direction: column; gap: 0.35rem; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--tide);
+  }
+  h1 {
+    font-family: Cinzel, Georgia, serif; font-weight: 800;
+    font-size: clamp(2rem, 6vw, 3.4rem); margin: 0; letter-spacing: 0.06em;
+    text-wrap: balance;
+    background: linear-gradient(178deg, #FBE7B4 8%, var(--gold) 40%, #9E6B26 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .sub { color: var(--tide); font-size: 0.95rem; max-width: 56ch; margin: 0 auto; }
+
+  .deck { display: grid; grid-template-columns: minmax(0,1fr) 260px; gap: calc(var(--step) * 2); align-items: start; }
+  @media (max-width: 820px) { .deck { grid-template-columns: minmax(0,1fr); } }
+
+  .cabinet { background: var(--frame); padding: 10px; border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.55); }
+  .screen { background: var(--hull); border-radius: 7px; padding: var(--step); position: relative; overflow: hidden; }
+
+  .reels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .reel { background: #0B242B; border-radius: 5px; overflow: hidden; position: relative; }
+  .cells { display: grid; grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 4px; }
+  .cell {
+    aspect-ratio: 1; display: grid; place-items: center; border-radius: 4px;
+    background: linear-gradient(180deg, #15343D, #0E272E);
+  }
+  .cell img { width: 84%; height: 84%; object-fit: contain; display: block; }
+  .cell.lit { background: linear-gradient(180deg, #4A3512, #2B1F0A); box-shadow: inset 0 0 0 2px var(--gold); }
+  .reel.spinning .cells { animation: churn .28s linear infinite; }
+  @keyframes churn { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+
+  .banner {
+    position: absolute; inset: auto 0 0 0; padding: .55rem;
+    font-family: Cinzel, Georgia, serif; font-weight: 600; text-align: center;
+    letter-spacing: .1em; text-transform: uppercase; font-size: .9rem;
+    background: linear-gradient(90deg, transparent, rgba(244,200,96,.22), transparent);
+    color: var(--gold); opacity: 0; transition: opacity .25s;
+  }
+  .banner.show { opacity: 1; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: var(--step); align-items: end; margin-top: var(--step); }
+  .field { display: flex; flex-direction: column; gap: .25rem; }
+  .label { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; color: var(--tide); }
+  .value { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 1.35rem; font-variant-numeric: tabular-nums; color: var(--rope); }
+  .value.win { color: var(--gold); }
+  .stepper { display: flex; gap: 4px; align-items: center; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid #7A5A28;
+    background: linear-gradient(180deg, var(--raised), #0D2A32); color: var(--rope);
+    padding: .4rem .7rem; transition: filter .15s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.25); }
+  button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .spin {
+    margin-left: auto; font-family: Cinzel, Georgia, serif; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase; font-size: 1rem;
+    padding: .75rem 2rem; color: #2A1B05; border-color: #E7C77E;
+    background: linear-gradient(180deg, #FBE1A4, var(--brass));
+  }
+
+  .assay { background: var(--hull); border: 1px solid #1D4C57; border-radius: 10px; padding: calc(var(--step) * 1.4); display: flex; flex-direction: column; gap: .9rem; }
+  .assay h2 { font-family: Cinzel, Georgia, serif; font-size: .95rem; letter-spacing: .12em; text-transform: uppercase; margin: 0; color: var(--brass); }
+  .assay p { margin: 0; font-size: .82rem; color: var(--tide); }
+  .rows { display: flex; flex-direction: column; gap: .4rem; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .82rem; font-variant-numeric: tabular-nums; }
+  .row span:first-child { color: var(--tide); }
+  .row span:last-child { color: var(--rope); }
+  .row.key span:last-child { color: var(--gold); font-size: 1.05rem; font-weight: 600; }
+  .meter { height: 5px; border-radius: 3px; background: #0B242B; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--tide), var(--gold)); transition: width .4s; }
+
+  table { width: 100%; border-collapse: collapse; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem; font-variant-numeric: tabular-nums; }
+  .paytable { background: var(--hull); border: 1px solid #1D4C57; border-radius: 10px; padding: calc(var(--step) * 1.4); overflow-x: auto; }
+  .paytable h2 { font-family: Cinzel, Georgia, serif; font-size: .95rem; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 .7rem; color: var(--brass); }
+  th { text-align: right; color: var(--tide); font-weight: 400; padding: .25rem .4rem; }
+  th:first-child { text-align: left; }
+  td { text-align: right; padding: .25rem .4rem; border-top: 1px solid #173A44; }
+  td:first-child { text-align: left; display: flex; align-items: center; gap: .5rem; color: var(--rope); }
+  td img { width: 22px; height: 22px; object-fit: contain; }
+
+  footer { color: var(--tide); font-size: .78rem; text-align: center; max-width: 62ch; margin: 0 auto; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="shell">
+  <header>
+    <div class="eyebrow">Recovered 2015 &middot; reels re-solved 2026</div>
+    <h1>Pirates Slot</h1>
+    <p class="sub">The original artwork, running on reel strips solved to a verified 94.00% return. The machine below reports its own odds and converges to them as you play.</p>
+  </header>
+
+  <div class="deck">
+    <div>
+      <div class="cabinet">
+        <div class="screen">
+          <div class="reels" id="reels"></div>
+          <div class="banner" id="banner"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="field">
+          <span class="label">Credits</span>
+          <span class="value" id="credits">10,000</span>
+        </div>
+        <div class="field">
+          <span class="label">Bet per line</span>
+          <div class="stepper">
+            <button id="down" aria-label="Lower bet">&minus;</button>
+            <span class="value" id="bet" style="min-width:2.5ch;text-align:center">2</span>
+            <button id="up" aria-label="Raise bet">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label">Total stake &middot; 30 lines</span>
+          <span class="value" id="stake">60</span>
+        </div>
+        <div class="field">
+          <span class="label">Last win</span>
+          <span class="value win" id="lastwin">0</span>
+        </div>
+        <button class="spin" id="spin">Spin</button>
+      </div>
+    </div>
+
+    <aside class="assay">
+      <h2>Assay</h2>
+      <p>Theoretical return, computed exactly over all 102,400,000 reel positions &mdash; not sampled.</p>
+      <div class="rows">
+        <div class="row key"><span>Verified RTP</span><span>94.00%</span></div>
+        <div class="row key"><span>Your RTP</span><span id="liveRtp">&mdash;</span></div>
+      </div>
+      <div class="meter"><i id="meter"></i></div>
+      <div class="rows">
+        <div class="row"><span>Spins</span><span id="spins">0</span></div>
+        <div class="row"><span>Staked</span><span id="staked">0</span></div>
+        <div class="row"><span>Returned</span><span id="returned">0</span></div>
+        <div class="row"><span>Best win</span><span id="best">0</span></div>
+        <div class="row"><span>Bonus hits</span><span id="bonus">0</span></div>
+      </div>
+      <p id="convergence">Short sessions swing wildly. Expect a few thousand spins before your figure settles near the verified one.</p>
+      <button id="auto">Auto-spin 250</button>
+      <button id="reset">Reset bank</button>
+    </aside>
+  </div>
+
+  <div class="paytable">
+    <h2>Paytable &middot; per line, &times; bet per line</h2>
+    <table id="paytable"></table>
+  </div>
+
+  <footer>
+    Play money only &mdash; nothing here can be bought, cashed out, or wagered. Wild substitutes for every symbol except Bonus. Three or more Bonus anywhere pays a multiple of the total stake.
+  </footer>
+</div>
+
+<script>
+const ART = __ASSETS__;
+const CFG = __CONFIG__;
+const LINES = __PAYLINES__;
+
+const PAYING = CFG.symbols.filter(s => s !== CFG.wild && s !== CFG.scatter);
+const NROWS = CFG.rows, NREELS = CFG.reels.length;
+
+/* Mirrors slotmath.exact.line_win_multiplier: count the run from reel 1 that is
+   the symbol or a wild, and pay the best-value symbol that qualifies. */
+function lineWin(combo) {
+  let best = 0;
+  for (const sym of PAYING) {
+    let run = 0;
+    for (const c of combo) { if (c === sym || c === CFG.wild) run++; else break; }
+    if (run >= 2) best = Math.max(best, (CFG.paytable[sym] || {})[run] || 0);
+  }
+  return best;
+}
+
+function spinWindow() {
+  return CFG.reels.map(strip => {
+    const stop = Math.floor(Math.random() * strip.length);
+    return Array.from({length: NROWS}, (_, r) => strip[(stop + r) % strip.length]);
+  });
+}
+
+function evaluate(win, betPerLine) {
+  let lineTotal = 0; const lit = [];
+  LINES.forEach(line => {
+    const combo = line.map((row, reel) => win[reel][row]);
+    const pay = lineWin(combo);
+    if (pay > 0) {
+      lineTotal += pay;
+      let run = 0;
+      for (const sym of PAYING) {
+        let r = 0;
+        for (const c of combo) { if (c === sym || c === CFG.wild) r++; else break; }
+        if (r >= 2 && ((CFG.paytable[sym] || {})[r] || 0) === pay) { run = r; break; }
+      }
+      for (let reel = 0; reel < run; reel++) lit.push([reel, line[reel]]);
+    }
+  });
+  const scatters = win.reduce((n, col) => n + col.filter(s => s === CFG.scatter).length, 0);
+  const scatterMult = CFG.scatter_pays[scatters] || 0;
+  return {
+    total: lineTotal * betPerLine + scatterMult * betPerLine * LINES.length,
+    lit, scatters, freeSpins: CFG.scatter_spins[scatters] || 0
+  };
+}
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString("en-GB");
+const BETS = [1, 2, 5, 10, 25, 50];
+let betIdx = 1, credits = 10000, spins = 0, staked = 0, returned = 0, best = 0, bonus = 0, busy = false;
+
+const reelEls = [];
+$("reels").innerHTML = "";
+for (let r = 0; r < NREELS; r++) {
+  const reel = document.createElement("div"); reel.className = "reel";
+  const cells = document.createElement("div"); cells.className = "cells";
+  const imgs = [];
+  for (let row = 0; row < NROWS; row++) {
+    const cell = document.createElement("div"); cell.className = "cell";
+    const img = document.createElement("img"); img.alt = "";
+    cell.appendChild(img); cells.appendChild(cell); imgs.push({cell, img});
+  }
+  reel.appendChild(cells); $("reels").appendChild(reel);
+  reelEls.push({reel, imgs});
+}
+
+function paint(win, lit) {
+  const key = new Set((lit || []).map(([a, b]) => a + ":" + b));
+  win.forEach((col, reel) => col.forEach((sym, row) => {
+    const {cell, img} = reelEls[reel].imgs[row];
+    img.src = ART[sym]; img.alt = sym;
+    cell.classList.toggle("lit", key.has(reel + ":" + row));
+  }));
+}
+
+function refresh() {
+  const bet = BETS[betIdx], stake = bet * LINES.length;
+  $("bet").textContent = bet; $("stake").textContent = fmt(stake);
+  $("credits").textContent = fmt(credits);
+  $("spins").textContent = fmt(spins);
+  $("staked").textContent = fmt(staked);
+  $("returned").textContent = fmt(returned);
+  $("best").textContent = fmt(best);
+  $("bonus").textContent = fmt(bonus);
+  const rtp = staked ? (returned / staked) * 100 : null;
+  $("liveRtp").textContent = rtp === null ? "—" : rtp.toFixed(2) + "%";
+  $("meter").style.width = rtp === null ? "0%" : Math.max(0, Math.min(100, rtp / 1.5)) + "%";
+  $("convergence").textContent = spins < 500
+    ? "Short sessions swing wildly. Expect a few thousand spins before your figure settles near the verified one."
+    : "After " + fmt(spins) + " spins you are " + (rtp >= 94 ? "above" : "below") + " the verified 94.00%, by "
+      + Math.abs(rtp - 94).toFixed(2) + " points.";
+  $("spin").disabled = busy || credits < stake;
+  $("auto").disabled = busy || credits < stake;
+  $("down").disabled = busy || betIdx === 0;
+  $("up").disabled = busy || betIdx === BETS.length - 1;
+}
+
+function settle(win, res, stake) {
+  credits += res.total; returned += res.total;
+  if (res.total > best) best = res.total;
+  if (res.freeSpins) bonus++;
+  paint(win, res.lit);
+  $("lastwin").textContent = fmt(res.total);
+  const b = $("banner");
+  if (res.freeSpins) { b.textContent = res.scatters + " Bonus — " + fmt(res.total) + " and " + res.freeSpins + " free spins"; b.classList.add("show"); }
+  else if (res.total >= stake * 10) { b.textContent = "Big win — " + fmt(res.total); b.classList.add("show"); }
+  else if (res.total > 0) { b.textContent = "Pays " + fmt(res.total); b.classList.add("show"); }
+  else b.classList.remove("show");
+  refresh();
+}
+
+function doSpin(animate) {
+  const bet = BETS[betIdx], stake = bet * LINES.length;
+  if (credits < stake) return null;
+  credits -= stake; staked += stake; spins++;
+  const win = spinWindow(), res = evaluate(win, bet);
+  if (!animate) { credits += res.total; returned += res.total; if (res.total > best) best = res.total; if (res.freeSpins) bonus++; return res; }
+  busy = true; refresh();
+  $("banner").classList.remove("show");
+  reelEls.forEach(({reel}) => reel.classList.add("spinning"));
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  reelEls.forEach(({reel}, i) => setTimeout(() => {
+    reel.classList.remove("spinning");
+    if (i === NREELS - 1) { busy = false; settle(win, res, stake); }
+  }, reduced ? 0 : 260 + i * 140));
+  return res;
+}
+
+$("spin").addEventListener("click", () => doSpin(true));
+$("down").addEventListener("click", () => { if (betIdx > 0) betIdx--; refresh(); });
+$("up").addEventListener("click", () => { if (betIdx < BETS.length - 1) betIdx++; refresh(); });
+$("reset").addEventListener("click", () => {
+  credits = 10000; spins = staked = returned = best = bonus = 0;
+  $("lastwin").textContent = "0"; $("banner").classList.remove("show"); refresh();
+});
+$("auto").addEventListener("click", () => {
+  let last = null, lastWin = null;
+  for (let i = 0; i < 250 && credits >= BETS[betIdx] * LINES.length; i++) {
+    const w = spinWindow(), bet = BETS[betIdx], stake = bet * LINES.length;
+    credits -= stake; staked += stake; spins++;
+    const res = evaluate(w, bet);
+    credits += res.total; returned += res.total;
+    if (res.total > best) best = res.total;
+    if (res.freeSpins) bonus++;
+    last = res; lastWin = w;
+  }
+  if (lastWin) { paint(lastWin, last.lit); $("lastwin").textContent = fmt(last.total); }
+  refresh();
+});
+
+const rows = ["<tr><th>Symbol</th><th>3</th><th>4</th><th>5</th></tr>"];
+for (const sym of PAYING) {
+  const t = CFG.paytable[sym] || {};
+  rows.push(`<tr><td><img src="${ART[sym]}" alt=""> ${sym}</td><td>${t[3] ?? "–"}</td><td>${t[4] ?? "–"}</td><td>${t[5] ?? "–"}</td></tr>`);
+}
+rows.push(`<tr><td><img src="${ART[CFG.scatter]}" alt=""> Bonus (anywhere)</td><td>${CFG.scatter_pays[3]}&times;</td><td>${CFG.scatter_pays[4]}&times;</td><td>${CFG.scatter_pays[5]}&times;</td></tr>`);
+$("paytable").innerHTML = rows.join("");
+
+paint(spinWindow(), []);
+refresh();
+</script>

@@ -21,6 +21,19 @@ app (`santaslotpaid.capx`). It is also the only one already on an HTML5 engine,
 which makes it the cheapest to revive and the only one with a real migration
 path (Construct 3 imports Construct 2 projects).
 
+## Play it
+
+**Pirate Slots, live:** https://claude.ai/code/artifact/24c0fb37-7050-48bd-81e6-26e9f1e64519
+
+The original artwork from the APK, running on the solved 40-position strips. It
+reports its own RTP as you play and converges on the verified 94.00%. Built by
+`build_web.py` from `math/pirates/config/pirates-v3.json`, so the reels and
+paytable are the same data the Python model verifies — the page cannot drift
+from the measured figures without the build changing.
+
+Checked against the model over 3,000,000 spins in Node: the page returns 93.93%
+against a computed 94.00%, with an any-win rate of 49.01% against 48.98%.
+
 ## The problem both games share
 
 Neither game has a defined RTP. Both pick symbols with a uniform random call and
