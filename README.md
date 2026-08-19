@@ -140,6 +140,38 @@ uniform reel model from that same file's `floor(random(0,14))`. An earlier
 estimate of ~61% in this repo's history was wrong: it guessed 15 symbols and a
 scatter component that does not exist.
 
+## Play Store position (checked 19 Aug 2026)
+
+Social casino apps are permitted on Google Play. This was verified against live
+listings rather than policy text: Slotomania (`air.com.playtika.slotomania`)
+has current Play listings including en_GB, and Jackpot Party is the top-grossing
+casino app on Android. Aggregator sites quote a line reading "apps must not
+provide simulated gambling content" as though it were a blanket ban; it cannot
+be, given the above, and appears to be lifted out of the real-money gambling
+policy or a country-scoped restriction.
+
+The certification whose standards change on **26 August 2026** is a **Google Ads**
+certification — it governs whether a social casino game can be *advertised*
+through Google Ads, not whether it can be *listed* on Play. It only matters if
+paid user acquisition is on the table, which the economics above argue against
+anyway.
+
+What does apply to publishing:
+
+- an 18+ content rating for simulated gambling, and no targeting of minors
+- disclosure of odds for any randomised virtual item sold for money (this game
+  sells coins outright, so it is likely not triggered)
+- country restrictions on where the app may be distributed
+- **target API 36 from 31 August 2026** for new apps and updates — the real
+  hard deadline, and the reason the cocos2d build cannot simply be re-uploaded
+- a 12-tester, 14-day closed test before production access on new personal
+  developer accounts
+
+Worth noting alongside this: the sector is under active press and regulatory
+scrutiny in 2026, including a Bloomberg investigation into social casino
+monetisation. Relevant when deciding how hard to lean on the LDW-heavy
+configurations recorded above.
+
 ## Known blockers
 
 - **Binary downloads from Dropbox are blocked.** `dl.dropboxusercontent.com` is
