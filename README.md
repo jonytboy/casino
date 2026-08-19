@@ -128,10 +128,10 @@ frequency changes.
 | metric | as shipped | solved |
 |---|---|---|
 | RTP | 47.47% | **94.00%** |
-| any-win rate | 18.62% | 30.27% |
-| net-win rate | 11.24% | 17.18% |
-| LDW rate | 7.39% | 13.09% |
-| max win | 285x | 175x |
+| any-win rate | 18.62% | 40.22% |
+| net-win rate | 11.24% | 19.29% |
+| LDW rate | 7.39% | 20.93% |
+| max win | 285x | **5000x** |
 
 Both figures are exact — the solved config is enumerated over all 40^5 =
 102,400,000 windows, not sampled.
@@ -145,13 +145,26 @@ takes a per-line hit-rate band alongside the RTP target, which is what moves
 any-win from 18.6% to 30.3%. LDW rises with it — more frequent small wins means
 more wins below stake — but at 13.1% it stays well under Pirate Slots' 20.7%.
 
-**Max win fell, and it is structural.** `build_strip` spaces repeated symbols
-evenly, so no premium symbol ever stacks (longest run is 1 on every reel). A
-large top win needs a premium filling all three rows of a reel at once, which
-2-in-40 spaced symbols can never do. The shipped game reached 285x only because
-uniform selection made premium-dense windows possible at any position. Real
-slots solve this with deliberately stacked premium symbols; that is a strip
-generator change, not a tuning change, and is the obvious next refinement.
+**The top award comes from stacking, not from tuning.** An earlier solve
+reached 94% with a max win of only 175x, because `build_strip` spaced repeats
+evenly and no premium ever stacked — and a large top win needs one symbol
+filling all three visible rows of a reel at once. `card0` is now fixed at 3 per
+reel and laid down as a contiguous block, so exactly one stop in 40 fills a reel
+with it. Five such stops together pay the 5000x top award, at odds of about
+**1 in 102,400,000 spins** — normal rarity for an advertised maximum.
+
+Stacking is free in RTP terms, which is worth knowing: line wins depend only on
+each reel's marginal symbol frequency, and that is count/length however the
+symbols are arranged. Stacking changes the joint distribution across rows, not
+the mean. `test_stacking_does_not_change_rtp` pins this.
+
+**The remaining weakness is the LDW rate**, which rose from 13.1% to 20.9% —
+now level with Pirate Slots. The cause is `card1` sitting at 12-14 positions per
+reel: it is what lifts the any-win rate to 40%, but its 3-of-a-kind pays 5
+against a 20-line stake, so those frequent wins return less than they cost. This
+is not fixable by moving symbols around. The clean fix is a paytable change —
+raise the cheap symbols' 3-of-a-kind above the stake — which would be the first
+deliberate departure from the game as shipped.
 
 ## Next
 

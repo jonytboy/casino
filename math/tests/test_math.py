@@ -38,6 +38,33 @@ def test_strip_builder_preserves_counts():
     assert max_run(strip, "Bonus") == 1, "scatters must not stack"
 
 
+def test_stacking_preserves_counts_and_blocks():
+    """Stacked symbols must form contiguous blocks without changing frequency."""
+    counts = {"top": 3, "mid": 5, "low": 14, "other": 18}
+    strip = build_strip(counts, stacks={"top": 3})
+    assert len(strip) == sum(counts.values())
+    for sym, n in counts.items():
+        assert strip.count(sym) == n, sym
+    assert max_run(strip, "top") == 3, "stacked symbol must form a block of 3"
+    assert max_run(strip, "mid") == 1, "unstacked symbols must stay spaced"
+
+
+def test_stacking_does_not_change_rtp():
+    """Arrangement must not move RTP: line wins depend only on marginals."""
+    from slotmath.model import GameConfig
+    counts = {"A": 3, "B": 6, "C": 10, "D": 21}
+    paytable = {"A": {3: 100, 4: 400, 5: 2000}, "B": {3: 10, 4: 40, 5: 200},
+                "C": {3: 5, 4: 20, 5: 100}}
+    def cfg_for(stacks):
+        return GameConfig(
+            name="t", symbols=["A", "B", "C", "D", "NoWild"], wild="NoWild",
+            scatter="D", paytable=paytable, scatter_pays={}, scatter_spins={},
+            reels=[build_strip(counts, stacks) for _ in range(5)])
+    flat = evaluate(cfg_for(None))["rtp_total"]
+    stacked = evaluate(cfg_for({"A": 3}))["rtp_total"]
+    assert abs(flat - stacked) < 1e-12, (flat, stacked)
+
+
 def test_wild_substitution():
     cfg = GameConfig.load(CONFIGS[0])
     # Five wilds should pay the best available five-of-a-kind.

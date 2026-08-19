@@ -26,18 +26,21 @@ BLANK = ["card13"]
 
 # Premiums must stay rare or the reels read as a jackpot machine; blanks give
 # the tuner somewhere to dump probability mass.
-START = {**{s: 1 for s in PREMIUM}, **{s: 3 for s in MID},
+START = {**{s: 1 for s in PREMIUM}, "card0": 3, **{s: 3 for s in MID},
          **{s: 4 for s in LOW}, "card12": 2, "card13": 6}
+START["card13"] = LEN - sum(v for k, v in START.items() if k != "card13")
 assert sum(START.values()) == LEN, sum(START.values())
 
 # Premiums stay rare; the cheap symbols are allowed to dominate the strip,
 # which is what produces frequent small wins without moving RTP much. card13
 # keeps a floor so the blank still appears on screen.
-# card0 carries the 5000x top award; hold it at 2 per reel so the headline
-# max win is not quietly traded away for hit rate.
-MINS = {"card0": 2, **{s: 1 for s in PREMIUM if s != "card0"}, **{s: 1 for s in MID},
+# card0 carries the 5000x top award. Fix it at exactly 3 per reel and stack
+# those three contiguously, so one stop can fill a whole reel with it -- which
+# is the only way many paylines can pay the top award at once.
+STACKS = {"card0": 3}
+MINS = {"card0": 3, **{s: 1 for s in PREMIUM if s != "card0"}, **{s: 1 for s in MID},
         **{s: 2 for s in LOW}, "card12": 1, "card13": 1}
-MAXS = {"card0": 2, "card11": 2, "card10": 3, "card9": 3,
+MAXS = {"card0": 3, "card11": 2, "card10": 3, "card9": 3,
         **{s: 5 for s in MID}, **{s: 14 for s in LOW},
         "card12": 3, "card13": 6}
 
@@ -49,7 +52,7 @@ print(f"target 94% RTP, {LEN}-position strips, premiums capped rare")
 # all; the true any-win figure is enumerated below.
 counts, cfg, _ = tune(base, counts, target_rtp=0.94,
                       target_trigger=(0.0, 1.0),   # no scatter in this game
-                      target_line_hit=(0.050, 0.070),
+                      target_line_hit=(0.050, 0.070), stacks=STACKS,
                       mins=MINS, maxs=MAXS, iterations=4000, verbose=False)
 
 before = evaluate(base, lines=len(PAYLINES), hit_rate=True)
