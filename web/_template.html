@@ -56,16 +56,26 @@
   .screen { background: var(--hull); border-radius: 7px; padding: var(--step); position: relative; overflow: hidden; }
 
   .reels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-  .reel { background: #0B242B; border-radius: 5px; overflow: hidden; position: relative; }
-  .cells { display: grid; grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 4px; }
+  /* Each reel is a 3-cell window onto a much taller column. Spinning slides the
+     column; the window stays put, which is what makes symbols travel past. */
+  .reel {
+    background: #0B242B; border-radius: 5px; position: relative;
+    overflow: hidden; height: calc(var(--cell, 60px) * 3 + 16px);
+  }
+  .cells { display: flex; flex-direction: column; gap: 4px; padding: 4px; will-change: transform; }
   .cell {
-    aspect-ratio: 1; display: grid; place-items: center; border-radius: 4px;
+    width: var(--cell, 60px); height: var(--cell, 60px); flex: 0 0 auto;
+    display: grid; place-items: center; border-radius: 4px;
     background: linear-gradient(180deg, #15343D, #0E272E);
   }
   .cell img { width: 84%; height: 84%; object-fit: contain; display: block; }
   .cell.lit { background: linear-gradient(180deg, #4A3512, #2B1F0A); box-shadow: inset 0 0 0 2px var(--gold); }
-  .reel.spinning .cells { animation: churn .28s linear infinite; }
-  @keyframes churn { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+  .cells.fast img { filter: blur(3px); }
+  .reel::before, .reel::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 16%; pointer-events: none; z-index: 2;
+  }
+  .reel::before { top: 0; background: linear-gradient(#0B242B, transparent); }
+  .reel::after { bottom: 0; background: linear-gradient(transparent, #0B242B); }
 
   .banner {
     position: absolute; inset: auto 0 0 0; padding: .55rem;
@@ -248,27 +258,82 @@ const fmt = n => Math.round(n).toLocaleString("en-GB");
 const BETS = [1, 2, 5, 10, 25, 50];
 let betIdx = 1, credits = 10000, spins = 0, staked = 0, returned = 0, best = 0, bonus = 0, busy = false;
 
+const GAP = 4, PADDING = 4, FILLER = 20;
+let CELL = 60, STEP = 64, currentWindow = null;
+
 const reelEls = [];
 $("reels").innerHTML = "";
 for (let r = 0; r < NREELS; r++) {
   const reel = document.createElement("div"); reel.className = "reel";
   const cells = document.createElement("div"); cells.className = "cells";
-  const imgs = [];
-  for (let row = 0; row < NROWS; row++) {
-    const cell = document.createElement("div"); cell.className = "cell";
-    const img = document.createElement("img"); img.alt = "";
-    cell.appendChild(img); cells.appendChild(cell); imgs.push({cell, img});
-  }
   reel.appendChild(cells); $("reels").appendChild(reel);
-  reelEls.push({reel, imgs});
+  reelEls.push({reel, cells});
+}
+
+/* Cells are square and sized off the reel's own width, so the 3-cell window and
+   the scroll step stay in step at any viewport size. */
+function sizeReels() {
+  const w = reelEls[0].reel.clientWidth - PADDING * 2;
+  CELL = Math.max(26, Math.round(w));
+  STEP = CELL + GAP;
+  document.documentElement.style.setProperty("--cell", CELL + "px");
+}
+
+function makeCell(sym) {
+  const cell = document.createElement("div"); cell.className = "cell";
+  const img = document.createElement("img"); img.src = ART[sym]; img.alt = sym;
+  cell.appendChild(img); return cell;
+}
+
+/* Column layout: the three result symbols sit at the top, with random strip
+   symbols below them. The column starts scrolled to the bottom and animates to
+   zero, so symbols fall downward through the window and settle on the result. */
+function fillColumn(reelIdx, resultSymbols, filler) {
+  const {cells} = reelEls[reelIdx];
+  const strip = CFG.reels[reelIdx];
+  cells.innerHTML = "";
+  resultSymbols.forEach(s => cells.appendChild(makeCell(s)));
+  for (let i = 0; i < filler; i++) {
+    cells.appendChild(makeCell(strip[Math.floor(Math.random() * strip.length)]));
+  }
+  return filler;
+}
+
+function highlight(lit) {
+  const key = new Set((lit || []).map(([a, b]) => a + ":" + b));
+  reelEls.forEach(({cells}, reel) => {
+    for (let row = 0; row < NROWS; row++) {
+      const cell = cells.children[row];
+      if (cell) cell.classList.toggle("lit", key.has(reel + ":" + row));
+    }
+  });
 }
 
 function paint(win, lit) {
-  const key = new Set((lit || []).map(([a, b]) => a + ":" + b));
-  win.forEach((col, reel) => col.forEach((sym, row) => {
-    const {cell, img} = reelEls[reel].imgs[row];
-    img.src = ART[sym]; img.alt = sym;
-    cell.classList.toggle("lit", key.has(reel + ":" + row));
+  currentWindow = win;
+  win.forEach((col, reel) => {
+    fillColumn(reel, col, 0);
+    reelEls[reel].cells.style.transform = "translateY(0px)";
+  });
+  highlight(lit);
+}
+
+function animateReels(win) {
+  currentWindow = win;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) { paint(win, []); return Promise.resolve(); }
+  return Promise.all(win.map((col, reel) => {
+    const {cells} = reelEls[reel];
+    const filler = fillColumn(reel, col, FILLER);
+    const from = -(filler * STEP);
+    cells.style.transform = `translateY(${from}px)`;
+    cells.classList.add("fast");
+    const anim = cells.animate(
+      [{transform: `translateY(${from}px)`}, {transform: "translateY(0px)"}],
+      {duration: 620 + reel * 170, easing: "cubic-bezier(.17,.67,.21,1)", fill: "forwards"}
+    );
+    setTimeout(() => cells.classList.remove("fast"), 420 + reel * 170);
+    return anim.finished.then(() => { cells.style.transform = "translateY(0px)"; });
   }));
 }
 
@@ -298,7 +363,7 @@ function settle(win, res, stake) {
   credits += res.total; returned += res.total;
   if (res.total > best) best = res.total;
   if (res.freeSpins) bonus++;
-  paint(win, res.lit);
+  highlight(res.lit);
   $("lastwin").textContent = fmt(res.total);
   const b = $("banner");
   if (res.freeSpins) { b.textContent = res.scatters + " Bonus — " + fmt(res.total) + " and " + res.freeSpins + " free spins"; b.classList.add("show"); }
@@ -308,24 +373,17 @@ function settle(win, res, stake) {
   refresh();
 }
 
-function doSpin(animate) {
+function doSpin() {
   const bet = BETS[betIdx], stake = bet * LINES.length;
-  if (credits < stake) return null;
+  if (credits < stake || busy) return;
   credits -= stake; staked += stake; spins++;
   const win = spinWindow(), res = evaluate(win, bet);
-  if (!animate) { credits += res.total; returned += res.total; if (res.total > best) best = res.total; if (res.freeSpins) bonus++; return res; }
   busy = true; refresh();
   $("banner").classList.remove("show");
-  reelEls.forEach(({reel}) => reel.classList.add("spinning"));
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  reelEls.forEach(({reel}, i) => setTimeout(() => {
-    reel.classList.remove("spinning");
-    if (i === NREELS - 1) { busy = false; settle(win, res, stake); }
-  }, reduced ? 0 : 260 + i * 140));
-  return res;
+  animateReels(win).then(() => { busy = false; settle(win, res, stake); });
 }
 
-$("spin").addEventListener("click", () => doSpin(true));
+$("spin").addEventListener("click", () => doSpin());
 $("down").addEventListener("click", () => { if (betIdx > 0) betIdx--; refresh(); });
 $("up").addEventListener("click", () => { if (betIdx < BETS.length - 1) betIdx++; refresh(); });
 $("reset").addEventListener("click", () => {
@@ -355,6 +413,11 @@ for (const sym of PAYING) {
 rows.push(`<tr><td><img src="${ART[CFG.scatter]}" alt=""> Bonus (anywhere)</td><td>${CFG.scatter_pays[3]}&times;</td><td>${CFG.scatter_pays[4]}&times;</td><td>${CFG.scatter_pays[5]}&times;</td></tr>`);
 $("paytable").innerHTML = rows.join("");
 
+sizeReels();
 paint(spinWindow(), []);
 refresh();
+addEventListener("resize", () => {
+  sizeReels();
+  if (currentWindow && !busy) paint(currentWindow, []);
+});
 </script>
