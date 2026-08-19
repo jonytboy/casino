@@ -41,14 +41,21 @@ def load_paytable(path=HERE / "source" / "prizes.xml"):
     return table
 
 
+# card0 is the wild. The artwork says WILD on it, and the event sheet's own
+# JavaScript confirms the mechanic: it scans for the first non-zero card to pick
+# the line's value, then accepts 0 anywhere in the run.
+WILD = "card0"
+# card13 is the BONUS symbol. It has no entry in prizes.xml, so it pays nothing
+# on a line; it drives the separate pick-a-box round, which is not modelled here.
+BONUS = "card13"
+
+
 def build(paytable) -> GameConfig:
     symbols = [f"card{i}" for i in range(N_SYMBOLS)]
-    # No wild appears anywhere in the project; declare one that never lands so
-    # the substitution rule stays inert.
     return GameConfig(
-        name="Santa Slots", symbols=symbols + ["NoWild"], wild="NoWild",
-        scatter="NoScatter" if False else f"card{N_SYMBOLS - 1}",
-        paytable={k: v for k, v in paytable.items()},
+        name="Santa Slots", symbols=symbols + ["NoScatter"], wild=WILD,
+        scatter="NoScatter", rule="leftmost_nonwild",
+        paytable={k: dict(v) for k, v in paytable.items()},
         scatter_pays={}, scatter_spins={},
         reels=[list(symbols) for _ in range(5)],
     )

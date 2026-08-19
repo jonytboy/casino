@@ -221,9 +221,20 @@ const LINES = __PAYLINES__;
 const PAYING = CFG.symbols.filter(s => s !== CFG.wild && s !== CFG.scatter);
 const NROWS = CFG.rows, NREELS = CFG.reels.length;
 
-/* Mirrors slotmath.exact.line_win_multiplier: count the run from reel 1 that is
-   the symbol or a wild, and pay the best-value symbol that qualifies. */
+/* Mirrors slotmath.exact.line_win_multiplier. Two rules, because the games
+   differ: "best" pays the highest-value symbol the wilds could complete, while
+   "leftmost_nonwild" pays the first non-wild symbol on the line whatever it is
+   worth. Santa Slots does the latter — its own event sheet scans for the first
+   non-wild and pays only that — and using the wrong rule shifts RTP by about a
+   point, which is exactly the kind of gap that hides in plain sight. */
 function lineWin(combo) {
+  if (CFG.rule === "leftmost_nonwild") {
+    let value = CFG.wild;
+    for (const c of combo) { if (c !== CFG.wild) { value = c; break; } }
+    let run = 0;
+    for (const c of combo) { if (c === value || c === CFG.wild) run++; else break; }
+    return run >= 2 ? ((CFG.paytable[value] || {})[run] || 0) : 0;
+  }
   let best = 0;
   for (const sym of PAYING) {
     let run = 0;
@@ -231,6 +242,24 @@ function lineWin(combo) {
     if (run >= 2) best = Math.max(best, (CFG.paytable[sym] || {})[run] || 0);
   }
   return best;
+}
+
+/* Length of the winning run, for highlighting the cells that paid. */
+function winRun(combo) {
+  if (CFG.rule === "leftmost_nonwild") {
+    let value = CFG.wild;
+    for (const c of combo) { if (c !== CFG.wild) { value = c; break; } }
+    let run = 0;
+    for (const c of combo) { if (c === value || c === CFG.wild) run++; else break; }
+    return run;
+  }
+  const pay = lineWin(combo);
+  for (const sym of PAYING) {
+    let run = 0;
+    for (const c of combo) { if (c === sym || c === CFG.wild) run++; else break; }
+    if (run >= 2 && ((CFG.paytable[sym] || {})[run] || 0) === pay) return run;
+  }
+  return 0;
 }
 
 function spinWindow() {
@@ -247,12 +276,7 @@ function evaluate(win, betPerLine) {
     const pay = lineWin(combo);
     if (pay > 0) {
       lineTotal += pay;
-      let run = 0;
-      for (const sym of PAYING) {
-        let r = 0;
-        for (const c of combo) { if (c === sym || c === CFG.wild) r++; else break; }
-        if (r >= 2 && ((CFG.paytable[sym] || {})[r] || 0) === pay) { run = r; break; }
-      }
+      const run = winRun(combo);
       for (let reel = 0; reel < run; reel++) lit.push([reel, line[reel]]);
     }
   });

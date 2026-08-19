@@ -25,6 +25,12 @@ class GameConfig:
     # five reel strips, each a list of symbol names
     reels: list[list[str]]
     rows: int = 3
+    # How a line resolves when wilds could complete more than one symbol.
+    #   "best"            - pay the highest-value symbol that qualifies
+    #   "leftmost_nonwild" - pay the first non-wild symbol on the line, whatever
+    #                        it is worth. Santa Slots does this; its event sheet
+    #                        scans for the leftmost non-wild and pays only that.
+    rule: str = "best"
 
     @property
     def paying_symbols(self) -> list[str]:
@@ -51,6 +57,7 @@ class GameConfig:
             assert len(strip) > 0, f"reel {i} is empty"
             unknown = set(strip) - set(self.symbols)
             assert not unknown, f"reel {i} has unknown symbols: {unknown}"
+        assert self.rule in ("best", "leftmost_nonwild"), self.rule
         assert self.wild in self.symbols
         assert self.scatter in self.symbols
         for sym, pays in self.paytable.items():
@@ -70,6 +77,7 @@ class GameConfig:
             scatter_spins={int(k): int(v) for k, v in data.get("scatter_spins", {}).items()},
             reels=data["reels"],
             rows=data.get("rows", 3),
+            rule=data.get("rule", "best"),
         )
         cfg.validate()
         return cfg
@@ -81,6 +89,7 @@ class GameConfig:
             "wild": self.wild,
             "scatter": self.scatter,
             "rows": self.rows,
+            "rule": self.rule,
             "paytable": {s: {str(k): v for k, v in t.items()} for s, t in self.paytable.items()},
             "scatter_pays": {str(k): v for k, v in self.scatter_pays.items()},
             "scatter_spins": {str(k): v for k, v in self.scatter_spins.items()},

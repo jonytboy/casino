@@ -25,13 +25,12 @@ path (Construct 3 imports Construct 2 projects).
 
 - **Pirate Slots:** https://claude.ai/code/artifact/24c0fb37-7050-48bd-81e6-26e9f1e64519
 - **Santa Slots:** https://claude.ai/code/artifact/aa8db3cb-2e88-4491-8d7b-e9b5e95348f2
-  (placeholder symbols — its artwork and audio are still in Dropbox)
+  (original artwork and sound)
 
 Both are built by `build_web.py` from the solved configs, so the reels, paytable
 and paylines are the same data the Python model verifies and a page cannot drift
-from the measured figures without the build changing. Pirate Slots carries the
-original artwork and all six sound effects from the APK; Santa Slots is still on
-placeholders.
+from the measured figures without the build changing. Both carry their original artwork and sound — Pirate Slots' from the APK's
+`res/raw`, Santa Slots' from the Construct project.
 
 Each build is checked by replaying its own JavaScript over millions of spins and
 comparing against the model. That check is not ceremony: it is what caught the
@@ -75,11 +74,15 @@ and stores expect:
 | game | measured RTP | notes |
 |---|---|---|
 | Pirate Slots | **68.40%** | exact |
-| Santa Slots | **47.47%** | exact, from the shipped `prizes.xml` |
+| Santa Slots | **229.60%** | exact, verified against the game's own JavaScript |
 
-Santa Slots — the game that sold best — returns **47.47%**. A player staking
-£100 gets back about £47. Both games were built to pay roughly half to two
-thirds of what the market expects.
+They fail in opposite directions. Pirate Slots pays **68.40%**, well under the
+92-96% band. Santa Slots pays **229.60%** — it returns more than twice what it
+takes, because its wild lands one spin in fourteen on every reel.
+
+That did no commercial damage, because Santa Slots shipped as a *paid* app with
+no coin sales: the credit economy simply inflates and the game never ends. The
+same paytable behind a coin store would have been ruinous.
 
 An undefined RTP blocks every commercial route: you cannot state your odds to a
 store, tune monetisation against it, or license the content to an operator.
@@ -119,26 +122,33 @@ Read directly from the Construct 2 project via the Dropbox connector.
 
 - **5x3 grid, 20 paylines, 14 symbols** (ids 0-13; only 0-12 pay), uniform
   RNG per cell — `floor(random(0,14))`.
+- **card0 is the wild** and also carries the top award. At 1-in-14 on every
+  reel it is the single biggest driver of the shipped game's RTP.
 - **Line 8 is an exact duplicate of line 3** (both `(0,0,0,0,0)`, the top row).
   This is RTP-neutral, since the player stakes for that line too — but it means
   lines 3 and 8 always win and lose together, which raises variance and wastes a
   payline slot that could have been a distinct pattern.
-- **Top award is 5000x line bet on `card0`** — 285x total bet, against Pirate
-  Slots' 51x. The best headline number in the portfolio.
-- **Four symbols pay from 2 of a kind** (`card0`, `card9`, `card10`, `card11`),
-  but the LDW rate is only 7.4% — far healthier than Pirates' 20.7%, because
-  14 uniform symbols make two-of-a-kind much rarer than Pirates' setup did.
+- **Four symbols pay from 2 of a kind** — the wild, the reindeer, the sleigh
+  and the present (`card0`, `card9`, `card10`, `card11`). `checkLine` hard-codes
+  exactly that set, and it matches the `lv="2"` rows in `prizes.xml`.
 - Bonus is a pick-a-box awarding `choose(10,15,20,25) * line_bet * lines`.
 - Credits persist in `WebStorage.LocalValue("credits")` — i.e. browser local
   storage, trivially editable by the player. Fine for a paid offline game,
   unacceptable if anything of value is ever attached to the balance.
 
+- **A line pays the first non-wild symbol on it, not the best one.** Three
+  wilds followed by a low symbol pays that low symbol, not the premium the wilds
+  could have completed. This is unusual and costs about a point of RTP against
+  the conventional rule, so the engine carries both as an explicit `rule` field.
+- **`card11` is drawn as a SCATTER and `card13` as a BONUS**, but `checkLine`
+  treats card11 as an ordinary left-to-right symbol — the scatter label is
+  decorative. card13 has no entry in `prizes.xml`, so it pays nothing on a line
+  and exists to drive the separate pick-a-box round, which is not yet modelled.
 - **`card12`'s paytable is reversed.** It reads 3-of-a-kind = 100, 4 = 10,
   5 = 3, so a better outcome pays less. Almost certainly the three values were
-  entered backwards. Note the direction of the error: because 3-of-a-kind is far
-  commoner than 5, the bug *over*-pays. Un-reversing it to 3/10/100 drops RTP
-  from 47.47% to 44.21%, so the shipped game is accidentally more generous than
-  intended — correcting it in isolation makes the game worse for the player.
+  entered backwards. Because 3-of-a-kind is far commoner than 5, the bug
+  *over*-pays: un-reversing it to 3/10/100 drops the shipped RTP from 229.60% to
+  208.95%.
 
 Nothing above is inferred. The paytable comes from `Files/prizes.xml`, the
 paylines from the 20 `checkLine` calls in `Event sheets/game.xml`, and the
@@ -221,21 +231,28 @@ frequency changes.
 
 | metric | as shipped | solved |
 |---|---|---|
-| RTP | 47.47% | **94.00%** |
-| any-win rate | 15.34% | 34.36% |
-| net-win rate | 10.23% | 18.11% |
-| LDW rate | 5.11% | 16.26% |
-| max win | 512x | **5000x** |
+| RTP | 229.60% | **94.00%** |
+| any-win rate | 40.09% | 30.28% |
+| net-win rate | 28.36% | 16.95% |
+| LDW rate | 11.72% | 13.33% |
+| max win | 546x | **900x** |
 
-An earlier revision of this table reported 40.22% / 19.29% / 20.93% / 285x for
-the solved column. Those were wrong: `evaluate()` took a line *count* and
-enumerated against the default 30-line set, so Santa's 20-line game was measured
-over Pirate Slots' paylines. RTP is invariant to the line count, so it kept
-agreeing and hid the fault — the figure used as the cross-check was the one
-metric incapable of catching it. Caught by replaying the built page's own
-JavaScript, which disagreed by six points. Pirate Slots was unaffected, since it
-uses the 30-line default. `evaluate()` now takes the payline list and rejects an
-int, with two regression tests.
+Two earlier revisions of this table were wrong, both caught the same way — by
+building the playable page and finding its JavaScript disagreed with the model:
+
+1. `evaluate()` took a line *count* and enumerated against the default 30-line
+   set, so Santa's 20-line game was measured over Pirate Slots' paylines. RTP is
+   invariant to the line count, so the figure being used as the cross-check was
+   the one metric incapable of catching it.
+2. Worse: **card0 is the wild**, and it was modelled as an ordinary symbol. The
+   artwork says WILD on it, and the event sheet's JavaScript confirms the
+   mechanic. That alone moved the shipped game's RTP from a reported 47.47% to
+   an actual 229.60%.
+
+`math/santa/verify_against_game.py` now transcribes the shipped `checkLine`
+function and compares it against the model across all 537,824 possible lines.
+It reports zero mismatches, so the model is the game rather than an
+approximation of it.
 
 Both figures are exact — the solved config is enumerated over all 40^5 =
 102,400,000 windows, not sampled.
@@ -272,6 +289,11 @@ deliberate departure from the game as shipped.
 
 ## Next
 
-1. Add stacked-symbol support to `strips.py` and recover the top-win headline.
-2. Sweep the remaining five games' Dropbox folders for unzipped source.
-3. Decide the shipping engine. Santa Slots being Construct 2 argues for HTML5.
+1. Model Santa's pick-a-box bonus round. `BONUS.xml` awards
+   `choose(10,15,20,25) * line_bet * lines` per opened box, which is large
+   enough to matter, and it is currently outside the RTP figure entirely.
+2. Confirm Pirate Slots' win rule from the decompiled cocos2d source. It is
+   assumed to be `best`; Santa's turned out not to be, so the assumption is
+   worth checking rather than trusting.
+3. Recover the remaining four games' source.
+4. Decide the shipping engine. Santa Slots being Construct 2 argues for HTML5.

@@ -34,6 +34,23 @@ def line_win_multiplier(cfg: GameConfig, combo: tuple[str, ...]) -> float:
     pays the highest-value symbol it qualifies for, which matters when wilds
     could complete more than one symbol.
     """
+    if cfg.rule == "leftmost_nonwild":
+        # Santa Slots: the line pays the first non-wild symbol on it, whatever
+        # that symbol is worth -- not the most valuable symbol the wilds could
+        # complete. An all-wild line pays the wild's own row.
+        value = cfg.wild
+        for c in combo:
+            if c != cfg.wild:
+                value = c
+                break
+        run = 0
+        for c in combo:
+            if c == value or c == cfg.wild:
+                run += 1
+            else:
+                break
+        return cfg.paytable.get(value, {}).get(run, 0.0) if run >= 2 else 0.0
+
     best = 0.0
     for sym in cfg.paying_symbols:
         run = 0
@@ -54,7 +71,7 @@ def _win_tensor(cfg: GameConfig) -> tuple[np.ndarray, np.ndarray]:
     evaluations a tuning run performs.
     """
     key = (
-        tuple(cfg.symbols), cfg.wild, cfg.scatter,
+        tuple(cfg.symbols), cfg.wild, cfg.scatter, cfg.rule,
         tuple((s, tuple(sorted(t.items()))) for s, t in sorted(cfg.paytable.items())),
     )
     hit = _TENSOR_CACHE.get(key)

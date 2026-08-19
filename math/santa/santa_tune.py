@@ -18,7 +18,8 @@ from slotmath.exact import evaluate
 from slotmath.tune import tune
 
 LEN = 40
-PREMIUM = ["card0", "card11", "card10", "card9"]   # pay from 2 of a kind
+WILD_SYM = ["card0"]                              # the wild, and it pays from 2
+PREMIUM = ["card11", "card10", "card9"]           # also pay from 2 of a kind
 MID = ["card7", "card8", "card5", "card6"]
 LOW = ["card1", "card2", "card3", "card4"]
 ODD = ["card12"]
@@ -26,7 +27,7 @@ BLANK = ["card13"]
 
 # Premiums must stay rare or the reels read as a jackpot machine; blanks give
 # the tuner somewhere to dump probability mass.
-START = {**{s: 1 for s in PREMIUM}, "card0": 3, **{s: 3 for s in MID},
+START = {**{s: 2 for s in PREMIUM}, "card0": 2, **{s: 3 for s in MID},
          **{s: 4 for s in LOW}, "card12": 2, "card13": 6}
 START["card13"] = LEN - sum(v for k, v in START.items() if k != "card13")
 assert sum(START.values()) == LEN, sum(START.values())
@@ -34,11 +35,11 @@ assert sum(START.values()) == LEN, sum(START.values())
 # Premiums stay rare; the cheap symbols are allowed to dominate the strip,
 # which is what produces frequent small wins without moving RTP much. card13
 # keeps a floor so the blank still appears on screen.
-# card0 carries the 5000x top award. Fix it at exactly 3 per reel and stack
-# those three contiguously, so one stop can fill a whole reel with it -- which
-# is the only way many paylines can pay the top award at once.
-STACKS = {"card0": 3}
-MINS = {"card0": 3, **{s: 1 for s in PREMIUM if s != "card0"}, **{s: 1 for s in MID},
+# card0 is the wild AND carries the 5000x top award, so its frequency is by far
+# the strongest lever on RTP: at 1-in-14 uniform it drove the shipped game to
+# 229.60%. Keep it scarce and let the tuner place it.
+STACKS = {}
+MINS = {"card0": 1, **{s: 1 for s in PREMIUM if s != "card0"}, **{s: 1 for s in MID},
         **{s: 2 for s in LOW}, "card12": 1, "card13": 1}
 MAXS = {"card0": 3, "card11": 2, "card10": 3, "card9": 3,
         **{s: 5 for s in MID}, **{s: 14 for s in LOW},
@@ -52,10 +53,10 @@ print(f"target 94% RTP, {LEN}-position strips, premiums capped rare")
 # all; the true any-win figure is enumerated below.
 counts, cfg, _ = tune(base, counts, target_rtp=0.94,
                       target_trigger=(0.0, 1.0),   # no scatter in this game
-                      target_line_hit=(0.050, 0.070), stacks=STACKS,
+                      target_line_hit=(0.045, 0.075), stacks=STACKS, lines=PAYLINES,
                       mins=MINS, maxs=MAXS, iterations=4000, verbose=False)
 
-before = evaluate(base, lines=PAYLINES, hit_rate=True)
+before = evaluate(base, lines=PAYLINES, hit_rate=True, max_windows=None)
 print("\nenumerating 102,400,000 windows for exact stats (slow)...")
 after = evaluate(cfg, lines=PAYLINES, hit_rate=True, max_windows=None)
 

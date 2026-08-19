@@ -93,6 +93,27 @@ def test_evaluate_rejects_a_line_count():
     raise AssertionError("evaluate() should reject an int for lines")
 
 
+def test_leftmost_nonwild_rule():
+    """The two win rules must actually differ, and in the documented direction.
+
+    Santa Slots pays the first non-wild symbol on a line; Pirate Slots pays the
+    best symbol the wilds could complete. Three wilds followed by a low symbol
+    is where they part company.
+    """
+    from slotmath.model import GameConfig
+    pt = {"low": {3: 7, 4: 25, 5: 150}, "high": {2: 10, 3: 150, 4: 500, 5: 5000}}
+    syms = ["wild", "low", "high", "other", "none"]
+    def cfg_for(rule):
+        return GameConfig(name="t", symbols=syms, wild="wild", scatter="none",
+                          paytable=pt, scatter_pays={}, scatter_spins={},
+                          reels=[syms[:4]] * 5, rule=rule)
+    combo = ("wild", "wild", "wild", "low", "other")
+    assert line_win_multiplier(cfg_for("best"), combo) == 150
+    assert line_win_multiplier(cfg_for("leftmost_nonwild"), combo) == 25
+    # An all-wild line pays the wild's own row under the leftmost rule.
+    assert line_win_multiplier(cfg_for("leftmost_nonwild"), ("wild",) * 5) == 0
+
+
 def test_wild_substitution():
     cfg = GameConfig.load(CONFIGS[0])
     # Five wilds should pay the best available five-of-a-kind.

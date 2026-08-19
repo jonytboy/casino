@@ -43,45 +43,35 @@ def pirate_art(cfg):
 
 # ----------------------------------------------------------------- Santa Slots
 
-# Santa's artwork is still in Dropbox. Its symbols are known only by pay rank, so
-# the placeholders say exactly that instead of inventing imagery.
-SANTA_TIERS = {
-    "card0":  ("#F4C860", "#4A3512", "TOP"),
-    "card11": ("#E0784B", "#3A1B0E", "PREM"),
-    "card10": ("#D9694E", "#3A1710", "PREM"),
-    "card9":  ("#C8595C", "#331216", "PREM"),
-    "card8":  ("#5FA9A2", "#12332F", "MID"),
-    "card7":  ("#57A0AC", "#122E33", "MID"),
-    "card6":  ("#5090B8", "#122736", "MID"),
-    "card5":  ("#5A86BE", "#131F33", "MID"),
-    "card4":  ("#6E8FA8", "#16242E", "LOW"),
-    "card3":  ("#6D95A0", "#16262A", "LOW"),
-    "card2":  ("#74998F", "#182722", "LOW"),
-    "card1":  ("#7C9C86", "#1A2720", "LOW"),
-    "card12": ("#9B7BB5", "#241A2E", "ODD"),
-    "card13": ("#37525C", "#16262C", ""),
-}
-
-
 def santa_art(cfg):
-    art = {}
-    for sym in cfg.symbols:
-        fill, ink, tier = SANTA_TIERS.get(sym, ("#37525C", "#16262C", ""))
-        top = max(cfg.paytable.get(sym, {}).values(), default=0)
-        label = sym.replace("card", "")
-        value = f"{top:g}" if top else "—"
-        svg = (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140">'
-            f'<circle cx="70" cy="70" r="62" fill="{fill}" stroke="{ink}" stroke-width="5"/>'
-            f'<text x="70" y="66" font-family="Georgia,serif" font-size="46" font-weight="bold"'
-            f' fill="{ink}" text-anchor="middle">{label}</text>'
-            f'<text x="70" y="96" font-family="monospace" font-size="20"'
-            f' fill="{ink}" text-anchor="middle" opacity=".8">{value}</text>'
-            f'<text x="70" y="120" font-family="monospace" font-size="13"'
-            f' fill="{ink}" text-anchor="middle" opacity=".6">{tier}</text></svg>'
-        )
-        art[sym] = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
-    return art, {}, {}
+    art_dir = ROOT / "assets" / "santa"
+    art = {s: data_uri(art_dir / "symbols" / f"{s}.png", "image/png")
+           for s in cfg.symbols if (art_dir / "symbols" / f"{s}.png").exists()}
+    # Symbols the config declares but the game never draws (the inert scatter
+    # placeholder) still need something to render.
+    blank = ("data:image/svg+xml;base64," + base64.b64encode(
+        b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 155 192"/>').decode())
+    for s in cfg.symbols:
+        art.setdefault(s, blank)
+
+    # Mapped from the project's own sound set: ROLL is the reel loop, GET the
+    # win, BONE the bonus box, HoHoHo the celebration.
+    stems = {"spin": "ROLL", "won": "GET", "coin": "SPIN",
+             "chest": "HoHoHo", "nudge": "stopROLL", "warning": "BONE"}
+    sfx = {k: data_uri(art_dir / "sounds" / f"{v}.ogg", "audio/ogg") for k, v in stems.items()}
+
+    # Santa has no recovered mute graphic, so draw one rather than borrow
+    # Pirate Slots' button plate.
+    def speaker(on):
+        waves = ('<path d="M30 16a12 12 0 0 1 0 18" stroke="#E3D5BC" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
+                 if on else
+                 '<path d="M30 17l14 16M44 17L30 33" stroke="#C8595C" stroke-width="3.5" stroke-linecap="round"/>')
+        svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">'
+               f'<rect width="50" height="50" rx="9" fill="#16414C"/>'
+               f'<path d="M12 20h6l8-7v24l-8-7h-6z" fill="#E3D5BC"/>{waves}</svg>')
+        return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+    return art, sfx, {"on": speaker(True), "off": speaker(False)}
 
 
 # ----------------------------------------------------------------------- build
@@ -99,11 +89,12 @@ GAMES = {
     "santa": dict(
         config="math/santa/config/santa-94.json", lines=SANTA_LINES, art=santa_art,
         title="Santa Slots", out="santa-slot.html", pages=False,
-        subtitle="Reel strips solved to a verified 94.00% return, up from the 47.47% "
-                 "the original shipped with. Symbols are placeholders showing each "
-                 "one's rank and top award until the artwork is recovered.",
-        rules="Symbols are placeholders: the number is the symbol's id and beneath it "
-              "is its five-of-a-kind award. This game has no wild and no scatter.",
+        subtitle="The original artwork and sound, on reel strips solved to a verified "
+                 "94.00% return. The game shipped paying 229.60% \u2014 more than twice "
+                 "what it took \u2014 because its wild landed one spin in fourteen.",
+        rules="The wild substitutes for any symbol, and a line pays the first non-wild "
+              "symbol on it. Two of a kind pays only on the wild, the reindeer, the "
+              "sleigh and the present.",
     ),
 }
 
@@ -121,7 +112,7 @@ def build(key: str) -> pathlib.Path:
 
     payload = {k: getattr(cfg, k) for k in
                ("symbols", "wild", "scatter", "rows", "paytable", "scatter_pays",
-                "scatter_spins", "reels")}
+                "scatter_spins", "reels", "rule")}
     out = (ROOT / "web" / "_template.html").read_text()
     for token, value in (
         ("__ASSETS__", json.dumps(art)), ("__CONFIG__", json.dumps(payload)),
