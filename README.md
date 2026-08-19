@@ -80,9 +80,24 @@ They fail in opposite directions. Pirate Slots pays **68.40%**, well under the
 92-96% band. Santa Slots pays **229.60%** — it returns more than twice what it
 takes, because its wild lands one spin in fourteen on every reel.
 
-That did no commercial damage, because Santa Slots shipped as a *paid* app with
-no coin sales: the credit economy simply inflates and the game never ends. The
-same paytable behind a coin store would have been ruinous.
+That was not harmless. These shipped **free, funded by ads** — the paid build
+was the same game with the ads removed. In a coin-based slot the highest-value
+ad unit is rewarded video, and it is triggered by scarcity: the player runs dry
+and is offered coins for an ad view. At 229.60% the balance only ever climbs, so
+that prompt never fires.
+
+`math/bankroll.py` measures it. Starting with 10,000 credits at 2 per line:
+
+| game | median spins to broke | runs that never went broke |
+|---|---|---|
+| Santa — as shipped (229.60%) | never | **120 / 120** |
+| Santa — solved (94.00%) | 1,747 | 0 / 120 |
+| Pirates — solved (94.00%) | 1,470 | 0 / 120 |
+
+Not one simulated player ran out of credits in the shipped game. The reward-video
+loop could not fire, which is a plausible large part of why the portfolio never
+earned. Solving to 94% gives roughly 1,500-1,750 spins of runway before the
+first ask — long enough to be enjoyed, finite enough to monetise.
 
 An undefined RTP blocks every commercial route: you cannot state your odds to a
 store, tune monetisation against it, or license the content to an operator.
