@@ -172,6 +172,31 @@ scrutiny in 2026, including a Bloomberg investigation into social casino
 monetisation. Relevant when deciding how hard to lean on the LDW-heavy
 configurations recorded above.
 
+### The signing key is a third party's
+
+`META-INF/CERT.RSA` in the shipped APK is signed by:
+
+    CN=mrinmoy, OU=amj, O=amj, L=kol, ST=wb, C=in   (Kolkata, India)
+    SHA1 C2:55:7C:B9:45:91:7D:9E:08:DA:8D:0D:FC:BB:68:17:7C:62:99:98
+    valid 2014-11-04 to 2042-03-22, 2048-bit RSA, SHA1withRSA
+
+That is the original development agency, not the account holder. It matters
+because an update to an existing Play listing must be signed with the same key.
+Without that keystore, `com.jonty.caribbeanslots` cannot be updated in place.
+
+The escape hatch is Play App Signing: if the app was enrolled, Google holds the
+app signing key and only the upload key is needed, which support can reset.
+Play App Signing became the default for new apps in 2021, so a 2015 title is
+unlikely to be enrolled unless it was opted in later. Worth checking under
+**Play Console -> the app -> Test and release -> App integrity**.
+
+If neither the keystore nor Play App Signing is available, the game has to ship
+under a new package name. Published package names can never be reused, so the
+old listing, its reviews and its install base are lost. Not fatal — the client
+is a rewrite regardless — but it is the difference between updating a listing
+and starting one from zero, and it matters most for whichever title actually
+had an audience.
+
 ## Known blockers
 
 - **Binary downloads from Dropbox are blocked.** `dl.dropboxusercontent.com` is
