@@ -15,7 +15,9 @@ from slotmath.paylines import PAYLINES, REELS, ROWS
 from slotmath.simulate import simulate
 from slotmath.strips import build_strip, max_run
 
-CONFIGS = sorted((Path(__file__).resolve().parents[1] / "pirates" / "config").glob("*.json"))
+_ROOT = Path(__file__).resolve().parents[1]
+CONFIGS = sorted(list((_ROOT / "pirates" / "config").glob("*.json"))
+                 + list((_ROOT / "santa" / "config").glob("*.json")))
 
 
 def test_paylines_wellformed():

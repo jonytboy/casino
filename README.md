@@ -118,9 +118,43 @@ scatter component that does not exist.
 - Most source is inside `.zip` archives, which the text-extraction path cannot
   open. Santa Slots is the exception — its source is unzipped in Dropbox.
 
+## Santa Slots solved to 94%
+
+`math/santa/santa_tune.py` introduces reel strips — the shipped game has none —
+and solves their composition. The paytable is left exactly as shipped, including
+`card12`'s reversed values, so the game keeps its identity; only symbol
+frequency changes.
+
+| metric | as shipped | solved |
+|---|---|---|
+| RTP | 47.47% | **94.00%** |
+| any-win rate | 18.62% | 30.27% |
+| net-win rate | 11.24% | 17.18% |
+| LDW rate | 7.39% | 13.09% |
+| max win | 285x | 175x |
+
+Both figures are exact — the solved config is enumerated over all 40^5 =
+102,400,000 windows, not sampled.
+
+Two things are worth understanding about that table.
+
+**RTP alone is not a design target.** The first solve hit 94.00% with a reel
+that paid on one spin in five: it had loaded two mid-value symbols to the cap
+and minimised the cheap ones. Correct arithmetic, unplayable game. The tuner now
+takes a per-line hit-rate band alongside the RTP target, which is what moves
+any-win from 18.6% to 30.3%. LDW rises with it — more frequent small wins means
+more wins below stake — but at 13.1% it stays well under Pirate Slots' 20.7%.
+
+**Max win fell, and it is structural.** `build_strip` spaces repeated symbols
+evenly, so no premium symbol ever stacks (longest run is 1 on every reel). A
+large top win needs a premium filling all three rows of a reel at once, which
+2-in-40 spaced symbols can never do. The shipped game reached 285x only because
+uniform selection made premium-dense windows possible at any position. Real
+slots solve this with deliberately stacked premium symbols; that is a strip
+generator change, not a tuning change, and is the obvious next refinement.
+
 ## Next
 
-1. Solve Santa Slots reel strips to a target RTP, as already done for Pirates.
-   This means introducing reel strips at all — there are none today.
+1. Add stacked-symbol support to `strips.py` and recover the top-win headline.
 2. Sweep the remaining five games' Dropbox folders for unzipped source.
 3. Decide the shipping engine. Santa Slots being Construct 2 argues for HTML5.

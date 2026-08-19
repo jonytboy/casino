@@ -22,8 +22,17 @@ def _cfg_from_counts(base: GameConfig, counts: list[dict[str, int]]) -> GameConf
     )
 
 
-def objective(res: dict, target_rtp: float, target_trigger: tuple[float, float]) -> float:
-    """Lower is better. RTP dominates; bonus trigger is a soft band."""
+def objective(res: dict, target_rtp: float, target_trigger: tuple[float, float],
+              target_line_hit: tuple[float, float] | None = None) -> float:
+    """Lower is better. RTP dominates; trigger and hit rate are soft bands.
+
+    Hitting an RTP target says nothing about how the game feels: a reel loaded
+    with two mid-value symbols can pay 94% while four spins in five return
+    nothing. Per-line hit rate is the cheap lever on that. It is a proxy, not
+    the true any-win rate -- paylines overlap the same visible symbols, so they
+    are not independent -- but it moves with it and costs 3ms instead of
+    minutes, so optimise against it here and enumerate the real figure after.
+    """
     cost = abs(res["rtp_total"] - target_rtp) * 100.0
     lo, hi = target_trigger
     t = res["scatter_trigger_rate"]
@@ -31,6 +40,13 @@ def objective(res: dict, target_rtp: float, target_trigger: tuple[float, float])
         cost += (lo - t) * 3000.0
     elif t > hi:
         cost += (t - hi) * 3000.0
+    if target_line_hit is not None:
+        lo, hi = target_line_hit
+        h = res["line_hit_rate"]
+        if h < lo:
+            cost += (lo - h) * 400.0
+        elif h > hi:
+            cost += (h - hi) * 400.0
     return cost
 
 
@@ -39,6 +55,7 @@ def tune(
     counts: list[dict[str, int]],
     target_rtp: float = 0.94,
     target_trigger: tuple[float, float] = (0.004, 0.012),
+    target_line_hit: tuple[float, float] | None = None,
     mins: dict[str, int] | None = None,
     maxs: dict[str, int] | None = None,
     iterations: int = 600,
@@ -50,7 +67,7 @@ def tune(
     maxs = maxs or {}
     cur = [dict(c) for c in counts]
     cur_res = evaluate(_cfg_from_counts(base, cur))
-    cur_cost = objective(cur_res, target_rtp, target_trigger)
+    cur_cost = objective(cur_res, target_rtp, target_trigger, target_line_hit)
 
     for it in range(iterations):
         r = rng.randrange(len(cur))
@@ -70,7 +87,7 @@ def tune(
             res = evaluate(_cfg_from_counts(base, cand))
         except Exception:
             continue
-        cost = objective(res, target_rtp, target_trigger)
+        cost = objective(res, target_rtp, target_trigger, target_line_hit)
         if cost < cur_cost:
             cur, cur_res, cur_cost = cand, res, cost
             if verbose and it % 25 == 0:

@@ -66,14 +66,15 @@ def show(label, cfg, lines):
     return r
 
 
-pt = load_paytable()
-show("as shipped", build(pt), PAYLINES)
+if __name__ == "__main__":
+    pt = load_paytable()
+    show("as shipped", build(pt), PAYLINES)
 
-# card 12 reads 3oak=100, 4oak=10, 5oak=3 - strictly decreasing, so a better
-# outcome pays less. Treat it as a reversed data entry and check the cost.
-fixed = {k: dict(v) for k, v in pt.items()}
-fixed["card12"] = {3: 3, 4: 10, 5: 100}
-show("with card 12 un-reversed (3/10/100)", build(fixed), PAYLINES)
+    # card 12 reads 3oak=100, 4oak=10, 5oak=3 - strictly decreasing, so a better
+    # outcome pays less. Treat it as a reversed data entry and check the cost.
+    fixed = {k: dict(v) for k, v in pt.items()}
+    fixed["card12"] = {3: 3, 4: 10, 5: 100}
+    show("with card 12 un-reversed (3/10/100)", build(fixed), PAYLINES)
 
-show("un-reversed, duplicate payline 8 removed",
-     build(fixed), [l for i, l in enumerate(PAYLINES) if i != 7])
+    show("un-reversed, duplicate payline 8 removed",
+         build(fixed), [l for i, l in enumerate(PAYLINES) if i != 7])
