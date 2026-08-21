@@ -23,7 +23,7 @@ path (Construct 3 imports Construct 2 projects).
 
 ## Play it
 
-- **Exuma Casino (the lobby):** https://claude.ai/code/artifact/9ba2a514-793f-4cc4-9f83-606d979d9306
+- **Casino Carib (the lobby):** https://claude.ai/code/artifact/9ba2a514-793f-4cc4-9f83-606d979d9306
   Both machines, one shared purse. This is the demo build and labels itself as
   one; the live build is served by the API (see Hosting it).
 - **Pirate Slots:** https://claude.ai/code/artifact/24c0fb37-7050-48bd-81e6-26e9f1e64519
@@ -117,7 +117,7 @@ TLS, and a script that ships both. On a fresh Hetzner box with Docker:
     #   first start, and it cannot do that for a name that does not resolve
 
     # from your machine, every time
-    server/deploy/deploy.sh root@casino.example.com
+    server/deploy/deploy.sh root@casinocarib.com
 
 The compose file bind-mounts `./data` rather than using a named volume, so the
 balances are an ordinary directory you can see, copy and cron. `deploy.sh`
@@ -137,7 +137,7 @@ the part that is real.
 Rebuild the page whenever the maths or the artwork changes:
 
     python3 build_web.py static                       # static host
-    server/deploy/deploy.sh root@casino.example.com   # server host
+    server/deploy/deploy.sh root@casinocarib.com   # server host
 
 ### Backing up the balances
 
@@ -147,7 +147,7 @@ rebuilds every page from the configs, the configs are in git, the artwork is in
 
     # on the VPS — server/deploy/backup.cron installs this nightly
     cd /opt/casino && docker compose exec -T api node scripts/backup.mjs /data/backups 14
-    scp root@casino.example.com:/opt/casino/data/backups/casino-....db .
+    scp root@casinocarib.com:/opt/casino/data/backups/casino-....db .
 
     # or on Fly
     fly ssh console -C "node /app/scripts/backup.mjs /data/backups 14"

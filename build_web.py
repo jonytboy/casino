@@ -158,6 +158,24 @@ STORE = {
 }
 
 
+BRAND = "Casino Carib"
+
+
+def brand_mark():
+    """The wordmark, if one has been dropped into assets/brand.
+
+    Returns a data URI or None. None is a supported state, not a broken one:
+    the page sets the name in type instead, so the build never depends on an
+    asset being present. See assets/brand/README.md.
+    """
+    for ext, mime in (("svg", "image/svg+xml"), ("png", "image/png"),
+                      ("gif", "image/gif")):
+        path = ROOT / "assets" / "brand" / f"logo.{ext}"
+        if path.exists():
+            return data_uri(path, mime)
+    return None
+
+
 def hub_page() -> tuple:
     """Assemble both machines into one lobby with a shared purse."""
     games = {}
@@ -189,7 +207,12 @@ def hub_page() -> tuple:
             "preview": preview,
         }
 
-    parts = [(ROOT / "web" / f"_hub_{n}.html").read_text() for n in ("head", "body", "script")]
+    mark = brand_mark()
+    marked = (f'<img class="mark" src="{mark}" alt="{BRAND}">' if mark
+              else f'<span class="brand">{BRAND}</span>')
+    parts = [(ROOT / "web" / f"_hub_{n}.html").read_text()
+             .replace("__BRANDMARK__", marked).replace("__BRAND__", BRAND)
+             for n in ("head", "body", "script")]
     return parts, games
 
 
@@ -214,7 +237,7 @@ def build_hub() -> pathlib.Path:
     dest.write_text(fill("\n".join(parts), games, api))
     kb = dest.stat().st_size / 1024
     mode = "demo" if api is None else f"live -> {api or 'same origin'}"
-    print(f"  {'Exuma Casino':14} {len(games)} machines, shared purse, {mode}"
+    print(f"  {BRAND:14} {len(games)} machines, shared purse, {mode}"
           f"  ->  web/casino.html ({kb:.0f} KB)")
     if kb > 15000:
         raise SystemExit("hub exceeds the 16MB artifact limit")

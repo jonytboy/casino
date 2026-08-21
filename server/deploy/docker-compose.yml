@@ -1,4 +1,4 @@
-# Exuma Casino on a single VPS. Two containers: the game, and Caddy in front of
+# Casino Carib on a single VPS. Two containers: the game, and Caddy in front of
 # it for TLS. Copy this directory to the box, fill in .env, `docker compose up -d`.
 #
 # The database is a bind mount rather than a named volume on purpose. On a VPS

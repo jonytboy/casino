@@ -2,7 +2,7 @@
 # Build the page, ship the server, restart it. Run from a checkout on your
 # machine, with SSH access to the box.
 #
-#   ./deploy.sh root@casino.example.com
+#   ./deploy.sh root@casinocarib.com
 #
 # Idempotent: safe to run repeatedly, and it never touches ./data on the server.
 set -euo pipefail

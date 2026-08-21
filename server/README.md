@@ -1,4 +1,4 @@
-# Exuma Casino — API
+# Casino Carib — API
 
 The authoritative half of the casino. **The client renders spins; this server
 decides them.** Nothing a browser sends is trusted beyond which game and which

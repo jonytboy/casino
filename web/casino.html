@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Exuma Casino</title>
+<title>Casino Carib</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Karla:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
@@ -27,6 +27,9 @@
          background:linear-gradient(178deg,#FBE7B4 8%,var(--gold) 40%,#9E6B26 100%);
          -webkit-background-clip:text;background-clip:text;color:transparent}
   .spacer{margin-right:auto}
+  /* The wordmark when one is supplied, sized off the bar rather than its own
+     pixels so a 2016 raster and a future SVG both sit right. */
+  .mark{height:1.9rem;width:auto;max-width:min(46vw,260px);object-fit:contain;display:block}
   /* Says whether the balance is real. A demo badge is not decoration: it is
      the difference between play money and money. */
   .mode{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.58rem;letter-spacing:.16em;
@@ -128,7 +131,7 @@
 
 <div class="shell">
   <div class="bar">
-    <span class="brand">Exuma Casino</span>
+    <span class="brand">Casino Carib</span>
     <span class="spacer"></span>
     <div class="purse">
       <span class="label">Coins</span>

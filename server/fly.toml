@@ -4,7 +4,7 @@
 # file on an attached volume, and two machines cannot share one volume. Scale
 # this app "up" by giving the machine more CPU, never by adding machines.
 
-app = "exuma-casino"
+app = "casino-carib"
 primary_region = "lhr"
 
 [build]
@@ -15,7 +15,7 @@ primary_region = "lhr"
   DB_PATH = "/data/casino.db"
   # The page is served from this same origin, so cross-origin requests are
   # nobody's legitimate traffic. Widen this only if you host the page elsewhere.
-  ALLOW_ORIGIN = "https://exuma-casino.fly.dev"
+  ALLOW_ORIGIN = "https://casino-carib.fly.dev"
 
 # The balances. Without this the database is inside the container filesystem and
 # disappears on the next deploy.

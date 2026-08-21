@@ -1,5 +1,5 @@
 /**
- * Exuma Casino API. No dependencies: node:http, node:sqlite, node:crypto only.
+ * Casino Carib API. No dependencies: node:http, node:sqlite, node:crypto only.
  *
  * The one rule that shapes everything: the client renders spins, the server
  * decides them. Nothing a browser sends is trusted beyond "which game, what
