@@ -1,0 +1,6 @@
+# Caddy gets and renews the certificate itself; there is no certbot step and no
+# renewal cron to forget. DOMAIN comes from .env.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy api:8080
+}

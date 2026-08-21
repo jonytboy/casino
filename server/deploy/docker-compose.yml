@@ -1,0 +1,48 @@
+# Exuma Casino on a single VPS. Two containers: the game, and Caddy in front of
+# it for TLS. Copy this directory to the box, fill in .env, `docker compose up -d`.
+#
+# The database is a bind mount rather than a named volume on purpose. On a VPS
+# you want to be able to see, copy and cron a backup of the balances with
+# ordinary tools, without going through `docker volume inspect` first.
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_PATH: /data/casino.db
+      PORT: "8080"
+    volumes:
+      - ./data:/data
+    # Not published to the host: Caddy is the only thing that should reach it,
+    # and binding 8080 publicly would serve the game over plain HTTP alongside
+    # the HTTPS Caddy is terminating.
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  caddy_data:      # certificates. Losing these means re-issuing, not disaster.
+  caddy_config:

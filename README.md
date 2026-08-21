@@ -85,29 +85,59 @@ than an assumption.
 
 ### Hosting it
 
-The server hosts the page. `python3 build_web.py serve` writes
-`server/public/index.html` — the same lobby as a standalone document with the
-API set to its own origin — and the server serves it at `/`.
+There are two ways to run this, and the cheap one is the right one until coins
+cost money.
 
-That is one deploy rather than two, and it removes a whole class of mistake: the
-page cannot end up pointed at the wrong API, or at a stale one, because it is
-only ever served by the API it talks to. It also means no CORS to configure, and
-`ALLOW_ORIGIN` stops mattering for normal traffic.
+**Static, free, no server.** `python3 build_web.py static` writes
+`dist/index.html`: the whole lobby as one self-contained file with no build
+step, no external requests and no backend. Drop that folder on Cloudflare
+Pages, Netlify, or any static host and it plays. The purse lives in the browser
+and the page labels itself **demo · local play**, which is honest and costs
+nothing.
 
-    cd server
-    fly launch --no-deploy          # first time only; creates the app
-    fly volumes create casino_data --size 1 --region lhr
-    fly deploy
+This is the entire product for as long as nothing is sold. What a server buys
+is a balance worth protecting — one that survives a cleared browser, follows a
+player between devices, and cannot be edited. None of that matters while the
+coins are free, and all of it matters the moment they are not.
 
-`fly.toml` is committed. One machine on purpose: the balances are a SQLite file
-on an attached volume, and two machines cannot share one volume — scale this by
-giving the machine more CPU, never by adding machines. `min_machines_running`
-is 0, so it sleeps when idle and cold-starts in about a second; nothing is lost
-by sleeping because the state is on the volume.
+**Server-hosted, when there is money to protect.** `python3 build_web.py serve`
+writes `server/public/index.html` — the same lobby with its API set to its own
+origin — and the server serves it at `/`. One deploy rather than two, which
+removes a class of mistake: a page only ever served by the API it talks to
+cannot be deployed pointing at a stale API, or somebody else's, and there is no
+CORS to get wrong because there is no cross origin.
+
+`server/deploy/` is a whole VPS deployment — the game, Caddy in front of it for
+TLS, and a script that ships both. On a fresh Hetzner box with Docker:
+
+    # once, on the server
+    mkdir -p /opt/casino && cd /opt/casino
+    #   copy server/deploy/.env.example here as .env and fill in DOMAIN
+    #   point a DNS A record at the box first: Caddy gets the certificate on
+    #   first start, and it cannot do that for a name that does not resolve
+
+    # from your machine, every time
+    server/deploy/deploy.sh root@casino.example.com
+
+The compose file bind-mounts `./data` rather than using a named volume, so the
+balances are an ordinary directory you can see, copy and cron. `deploy.sh`
+excludes `data/` from its rsync `--delete`, which is the one line standing
+between a routine deploy and wiping every player's coins.
+
+Caddy renews the certificate itself; there is no certbot step and no renewal
+cron to forget. `docker compose up -d` and `restart: unless-stopped` cover
+reboots.
+
+`server/fly.toml` is committed too if you would rather not run a box. Whichever
+you pick, it is one machine: the balances are a SQLite file on a disk, and two
+machines cannot share one — scale by giving the machine more CPU, never by
+adding machines. That disk is the part that is not free anywhere, because it is
+the part that is real.
 
 Rebuild the page whenever the maths or the artwork changes:
 
-    python3 build_web.py serve && (cd server && fly deploy)
+    python3 build_web.py static                       # static host
+    server/deploy/deploy.sh root@casino.example.com   # server host
 
 ### Backing up the balances
 
@@ -115,8 +145,12 @@ The volume is the only thing here that cannot be regenerated. `build_web.py`
 rebuilds every page from the configs, the configs are in git, the artwork is in
 `assets/` — but the balances exist in exactly one place.
 
+    # on the VPS — server/deploy/backup.cron installs this nightly
+    cd /opt/casino && docker compose exec -T api node scripts/backup.mjs /data/backups 14
+    scp root@casino.example.com:/opt/casino/data/backups/casino-....db .
+
+    # or on Fly
     fly ssh console -C "node /app/scripts/backup.mjs /data/backups 14"
-    fly ssh sftp get /data/backups/casino-....db      # pull one down
 
 `scripts/backup.mjs` uses SQLite's `VACUUM INTO`, which snapshots a live
 database consistently without stopping writes — `cp` on a running database can

@@ -221,36 +221,64 @@ def build_hub() -> pathlib.Path:
     return dest
 
 
-def build_public() -> pathlib.Path:
-    """The hosted build, served by the API itself.
+# Inlined so a standalone build is still one file with no second request, and
+# so a static host does not answer the browser's unprompted /favicon.ico with a
+# 404 in everyone's console.
+FAVICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwQTFEMjMiLz48cmVjdCB4PSI4IiB5PSIxNCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjMwIiByeD0iNSIgZmlsbD0iIzE2NDE0QyIgc3Ryb2tlPSIjQzA4QjNFIiBzdHJva2Utd2lkdGg9IjMiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjI5IiByPSI2IiBmaWxsPSIjRjRDODYwIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIyOSIgcj0iNiIgZmlsbD0iI0Y0Qzg2MCIvPjxjaXJjbGUgY3g9IjQ0IiBjeT0iMjkiIHI9IjYiIGZpbGw9IiNGNEM4NjAiLz48cmVjdCB4PSIyMCIgeT0iNDgiIHdpZHRoPSIyNCIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjQzA4QjNFIi8+PC9zdmc+"
 
-    Always live and always same-origin: the server that hosts this page is the
-    server that decides its spins, so there is no origin to configure and no
-    way to deploy a page pointed at the wrong one. The artifact build is a
-    fragment because the artifact host supplies the document around it; this
-    one has to bring its own.
+
+def standalone(api, dest: pathlib.Path, note: str) -> pathlib.Path:
+    """Write the lobby as a whole HTML document.
+
+    The artifact build is a fragment because the artifact host supplies the
+    document around it. Anything else — a web server, a static host — needs the
+    page to bring its own.
     """
     parts, games = hub_page()
-    head, body, script = (fill(part, games, "") for part in parts)
+    head, body, script = (fill(part, games, api) for part in parts)
     doc = ('<!doctype html>\n<html lang="en">\n<head>\n'
            f'{head}'
            '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+           f'<link rel="icon" href="{FAVICON}">\n'
            f'</head>\n<body>\n{body}\n{script}\n</body>\n</html>\n')
-    dest = ROOT / "server" / "public" / "index.html"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(doc)
     kb = dest.stat().st_size / 1024
-    print(f"  {'(hosted build)':14} standalone document, same-origin API"
-          f"  ->  server/public/index.html ({kb:.0f} KB)")
+    rel = dest.relative_to(ROOT)
+    print(f"  {'(standalone)':14} {note}  ->  {rel} ({kb:.0f} KB)")
     return dest
 
 
+def build_public() -> pathlib.Path:
+    """The build the API server hosts itself.
+
+    Always live and always same-origin: the server that hosts this page is the
+    server that decides its spins, so there is no origin to configure and no
+    way to deploy a page pointed at the wrong one.
+    """
+    return standalone("", ROOT / "server" / "public" / "index.html",
+                      "live, same-origin API")
+
+
+def build_static() -> pathlib.Path:
+    """The demo build for a static host.
+
+    No server, so no server to pay for. The purse lives in the browser and the
+    page says so. This is the whole product for as long as nothing is sold —
+    what a server buys you is a balance worth protecting, and until coins cost
+    money there is nothing to protect.
+    """
+    return standalone(None, ROOT / "dist" / "index.html", "demo, no server")
+
+
 if __name__ == "__main__":
-    wanted = sys.argv[1:] or list(GAMES) + ["hub", "serve"]
+    wanted = sys.argv[1:] or list(GAMES) + ["hub", "serve", "static"]
     for key in wanted:
         if key == "hub":
             build_hub()
         elif key == "serve":
             build_public()
+        elif key == "static":
+            build_static()
         else:
             build(key)

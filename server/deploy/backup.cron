@@ -1,0 +1,7 @@
+# Nightly snapshot of the balances, kept 14 deep. Install on the server with:
+#   crontab -l | cat - /opt/casino/backup.cron | crontab -
+#
+# The snapshot lands in ./data/backups on the host, so pulling one down is just
+# scp — no docker volume archaeology. Copy them off the box as well: a backup
+# on the same disk as the thing it backs up is not a backup.
+0 3 * * * cd /opt/casino && docker compose exec -T api node scripts/backup.mjs /data/backups 14 >> /var/log/casino-backup.log 2>&1
