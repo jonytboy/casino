@@ -114,7 +114,9 @@ TLS, and a script that ships both. On a fresh Hetzner box with Docker:
     mkdir -p /opt/casino && cd /opt/casino
     #   copy server/deploy/.env.example here as .env and fill in DOMAIN
     #   point a DNS A record at the box first: Caddy gets the certificate on
-    #   first start, and it cannot do that for a name that does not resolve
+    #   first start, and it cannot do that for a name that does not resolve.
+    #   With no domain yet, DOMAIN=<ip-with-dashes>.sslip.io works and still
+    #   gets a real certificate — see .env.example.
 
     # from your machine, every time
     server/deploy/deploy.sh root@casinocarib.com
