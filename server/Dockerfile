@@ -7,6 +7,11 @@ COPY package.json ./
 COPY index.js ./
 COPY src ./src
 COPY games ./games
+# The lobby, built by `python3 build_web.py serve`. The server hosts it so the
+# page and the API it trusts are always the same deploy.
+COPY public ./public
+# Present so backups can be taken with `fly ssh console -C`.
+COPY scripts ./scripts
 
 # The database is the only mutable state. Mount a volume here or the balances
 # disappear with the container.

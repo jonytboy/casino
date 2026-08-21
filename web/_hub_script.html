@@ -3,7 +3,9 @@ const GAMES = __GAMES__;
 const STORE = __STORE__;
 /* Where the authoritative server lives. null means there isn't one: the page
    then plays locally so it still works as a demo, and says so plainly rather
-   than pretending the balance means anything. */
+   than pretending the balance means anything. An empty string is not that --
+   it means the server is this page's own origin, which is how the hosted build
+   ships -- so every test here is against null, never truthiness. */
 const API = __API__;
 
 const $ = id => document.getElementById(id);
@@ -472,7 +474,7 @@ addEventListener("resize", () => { if (!busy && currentWindow && G) { sizeReels(
 
 async function boot() {
   let info = null;
-  if (API) {
+  if (API !== null) {
     try {
       info = await ServerEngine.init();
       engine = ServerEngine;

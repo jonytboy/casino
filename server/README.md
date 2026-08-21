@@ -19,12 +19,27 @@ to keep patched. Requires **Node 22.5+** for `node:sqlite`.
     npm start                 # or: node index.js
     npm test                  # 16 tests
 
+The server also hosts the game. Build the page first or `/` answers 503:
+
+    python3 ../build_web.py serve     # writes public/index.html
+
 Docker:
 
     docker build -t exuma-casino .
     docker run -p 8080:8080 -v exuma-data:/data --env-file .env exuma-casino
 
 `/data` must be a volume. It holds the balances.
+
+Fly.io, which `fly.toml` is written for:
+
+    fly launch --no-deploy
+    fly volumes create casino_data --size 1 --region lhr
+    fly deploy
+
+One machine, on purpose — the balances are a SQLite file on that volume, and two
+machines cannot share one. Scale by giving the machine more CPU.
+
+Take backups with `scripts/backup.mjs`; see the root README.
 
 ## Endpoints
 
@@ -37,6 +52,7 @@ Docker:
 | `POST` | `/api/webhook/whop` | Credit a completed purchase. Signature-checked and idempotent. |
 | `GET` | `/api/stats` | Realised return per game against the published figure. |
 | `GET` | `/api/health` | Liveness. |
+| `GET` | `/` | The game itself, from `public/index.html`. ETagged, gzipped, `no-cache` so a deploy is picked up but a repeat visit costs a 304 rather than a megabyte. |
 
 ## What stops the obvious attacks
 

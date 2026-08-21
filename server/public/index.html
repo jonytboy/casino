@@ -1,3 +1,6 @@
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <title>Exuma Casino</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -125,7 +128,9 @@
   .hidden{display:none !important}
   @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
 </style>
-
+<meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body>
 <div class="shell">
   <div class="bar">
     <span class="brand">Exuma Casino</span>
@@ -228,8 +233,10 @@ const GAMES = {"santa": {"key": "santa", "title": "Santa Slots", "cfg": {"symbol
 const STORE = {"checkoutBase": null, "packs": [{"id": "coins-10k", "coins": 10000, "price": "\u00a30.99"}, {"id": "coins-60k", "coins": 60000, "price": "\u00a34.99"}, {"id": "coins-200k", "coins": 200000, "price": "\u00a39.99"}]};
 /* Where the authoritative server lives. null means there isn't one: the page
    then plays locally so it still works as a demo, and says so plainly rather
-   than pretending the balance means anything. */
-const API = null;
+   than pretending the balance means anything. An empty string is not that --
+   it means the server is this page's own origin, which is how the hosted build
+   ships -- so every test here is against null, never truthiness. */
+const API = "";
 
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n).toLocaleString("en-GB");
@@ -697,7 +704,7 @@ addEventListener("resize", () => { if (!busy && currentWindow && G) { sizeReels(
 
 async function boot() {
   let info = null;
-  if (API) {
+  if (API !== null) {
     try {
       info = await ServerEngine.init();
       engine = ServerEngine;
@@ -728,3 +735,6 @@ async function boot() {
 }
 boot();
 </script>
+
+</body>
+</html>

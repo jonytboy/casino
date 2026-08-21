@@ -1,0 +1,44 @@
+# Fly.io deployment. One machine, one volume, one SQLite file.
+#
+# Single machine is deliberate, not a shortcut: the balances live in a SQLite
+# file on an attached volume, and two machines cannot share one volume. Scale
+# this app "up" by giving the machine more CPU, never by adding machines.
+
+app = "exuma-casino"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  DB_PATH = "/data/casino.db"
+  # The page is served from this same origin, so cross-origin requests are
+  # nobody's legitimate traffic. Widen this only if you host the page elsewhere.
+  ALLOW_ORIGIN = "https://exuma-casino.fly.dev"
+
+# The balances. Without this the database is inside the container filesystem and
+# disappears on the next deploy.
+[[mounts]]
+  source = "casino_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Zero is fine: a cold start is about a second, and nothing is lost by
+  # sleeping because the state is on the volume rather than in memory.
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

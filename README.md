@@ -24,8 +24,8 @@ path (Construct 3 imports Construct 2 projects).
 ## Play it
 
 - **Exuma Casino (the lobby):** https://claude.ai/code/artifact/9ba2a514-793f-4cc4-9f83-606d979d9306
-  Both machines, one shared purse. This is the launch build; `docs/index.html` is
-  the same file, ready for any static host.
+  Both machines, one shared purse. This is the demo build and labels itself as
+  one; the live build is served by the API (see Hosting it).
 - **Pirate Slots:** https://claude.ai/code/artifact/24c0fb37-7050-48bd-81e6-26e9f1e64519
 - **Santa Slots:** https://claude.ai/code/artifact/aa8db3cb-2e88-4491-8d7b-e9b5e95348f2
   (original artwork and sound)
@@ -54,13 +54,23 @@ bar and the coin packs stay inert.
 
     python3 build_web.py hub                                  # demo build
 
-With `CASINO_API` pointing at the server in `server/`, the page never computes an
-outcome. It asks for every spin, the server draws it and moves the balance, and
-the reels only animate a result that is already committed. That build says
-**live**, and if the API is unreachable at load it falls back to local play and
-says so rather than showing a balance that means nothing.
+The live build never computes an outcome. It asks for every spin, the server
+draws it and moves the balance, and the reels only animate a result that is
+already committed. That build says **live**, and if the API is unreachable at
+load it falls back to local play and relabels itself rather than showing a
+balance that means nothing.
 
-    CASINO_API=https://api.example.com python3 build_web.py hub   # live build
+    python3 build_web.py serve                                # live build
+
+`serve` writes `server/public/index.html`, which the server hosts itself — so
+its API is its own origin and there is nothing to configure. `CASINO_API` exists
+for the other case, hosting the page somewhere else:
+
+    CASINO_API=https://api.example.com python3 build_web.py hub
+
+An empty API means same origin and a null one means demo, which is why the page
+tests it against null rather than for truthiness — `""` is an answer, not an
+absence.
 
 `server/` is the authoritative half: accounts, server-held balances, a ledger
 every movement is written to, and a Whop webhook that credits coins after a
@@ -75,21 +85,44 @@ than an assumption.
 
 ### Hosting it
 
-`docs/index.html` is the built lobby, kept byte-identical to
-`web/casino.html` by `build_web.py`. To serve it from this repo:
-**Settings → Pages → Source: Deploy from a branch → `main` / `/docs`**. The URL
-is then `https://jonytboy.github.io/casino/`.
+The server hosts the page. `python3 build_web.py serve` writes
+`server/public/index.html` — the same lobby as a standalone document with the
+API set to its own origin — and the server serves it at `/`.
 
-Two things to know before flipping that switch. GitHub Pages on a *private*
-repo needs a paid plan; on a free plan the repo has to be public, which would
-publish the analysis and commit history alongside the game. And the page embeds
-the artwork as data URIs, so anyone with the URL can extract the symbol PNGs and
-the audio — worth weighing, since the art is the asset actually worth something
-here.
+That is one deploy rather than two, and it removes a whole class of mistake: the
+page cannot end up pointed at the wrong API, or at a stale one, because it is
+only ever served by the API it talks to. It also means no CORS to configure, and
+`ALLOW_ORIGIN` stops mattering for normal traffic.
 
-The page is a single self-contained file with no build step or external
-requests, so any static host works equally well: drag `docs/index.html` onto
-Netlify Drop, a Cloudflare Pages project, or any web server.
+    cd server
+    fly launch --no-deploy          # first time only; creates the app
+    fly volumes create casino_data --size 1 --region lhr
+    fly deploy
+
+`fly.toml` is committed. One machine on purpose: the balances are a SQLite file
+on an attached volume, and two machines cannot share one volume — scale this by
+giving the machine more CPU, never by adding machines. `min_machines_running`
+is 0, so it sleeps when idle and cold-starts in about a second; nothing is lost
+by sleeping because the state is on the volume.
+
+Rebuild the page whenever the maths or the artwork changes:
+
+    python3 build_web.py serve && (cd server && fly deploy)
+
+### Backing up the balances
+
+The volume is the only thing here that cannot be regenerated. `build_web.py`
+rebuilds every page from the configs, the configs are in git, the artwork is in
+`assets/` — but the balances exist in exactly one place.
+
+    fly ssh console -C "node /app/scripts/backup.mjs /data/backups 14"
+    fly ssh sftp get /data/backups/casino-....db      # pull one down
+
+`scripts/backup.mjs` uses SQLite's `VACUUM INTO`, which snapshots a live
+database consistently without stopping writes — `cp` on a running database can
+hand you a torn file that looks fine until the day you need it. It then reopens
+the snapshot and reports the player count and coin total, because a backup
+nobody has opened is a guess. Run it on a schedule you can live with losing.
 
 ## The problem both games share
 

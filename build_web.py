@@ -80,7 +80,7 @@ def santa_art(cfg):
 GAMES = {
     "pirates": dict(
         config="math/pirates/config/pirates-v3.json", lines=PIRATE_LINES, art=pirate_art,
-        title="Pirate Slots", out="pirates-slot.html", pages=True,
+        title="Pirate Slots", out="pirates-slot.html",
         subtitle="The original artwork, running on reel strips solved to a verified "
                  "94.00% return. The machine below reports its own odds and converges "
                  "to them as you play.",
@@ -89,7 +89,7 @@ GAMES = {
     ),
     "santa": dict(
         config="math/santa/config/santa-94.json", lines=SANTA_LINES, art=santa_art,
-        title="Santa Slots", out="santa-slot.html", pages=False,
+        title="Santa Slots", out="santa-slot.html",
         subtitle="The original artwork and sound, on reel strips solved to a verified "
                  "94.00% return. The game shipped paying 229.60% \u2014 more than twice "
                  "what it took \u2014 because its wild landed one spin in fourteen.",
@@ -127,10 +127,6 @@ def build(key: str) -> pathlib.Path:
 
     dest = ROOT / "web" / spec["out"]
     dest.write_text(out)
-    if spec["pages"]:
-        pages = ROOT / "docs" / "index.html"
-        pages.parent.mkdir(exist_ok=True)
-        pages.write_text(out)
     kb = dest.stat().st_size / 1024
     print(f"  {spec['title']:14} {rtp * 100:.2f}% RTP  {len(lines):>2} lines  "
           f"{windows:>12,} windows  ->  web/{spec['out']} ({kb:.0f} KB)")
@@ -162,7 +158,7 @@ STORE = {
 }
 
 
-def build_hub() -> pathlib.Path:
+def hub_page() -> tuple:
     """Assemble both machines into one lobby with a shared purse."""
     games = {}
     for key in ("santa", "pirates"):
@@ -194,29 +190,67 @@ def build_hub() -> pathlib.Path:
         }
 
     parts = [(ROOT / "web" / f"_hub_{n}.html").read_text() for n in ("head", "body", "script")]
-    out = "\n".join(parts)
-    # Set CASINO_API to the deployed server's origin to build the live client;
-    # with it unset the page plays locally and labels itself a demo.
-    api = os.environ.get("CASINO_API") or None
-    out = (out.replace("__GAMES__", json.dumps(games))
-              .replace("__STORE__", json.dumps(STORE))
-              .replace("__API__", json.dumps(api)))
+    return parts, games
+
+
+def fill(page: str, games: dict, api) -> str:
+    """Substitute the build-time constants.
+
+    `api` is null for a demo build, "" when the page is served from the API's
+    own origin, or an absolute origin when it is hosted elsewhere. Note that ""
+    is a real answer and not an absent one, so the page tests it against null.
+    """
+    return (page.replace("__GAMES__", json.dumps(games))
+                .replace("__STORE__", json.dumps(STORE))
+                .replace("__API__", json.dumps(api)))
+
+
+def build_hub() -> pathlib.Path:
+    """The artifact build. Demo unless CASINO_API names a server to talk to."""
+    parts, games = hub_page()
+    api = os.environ.get("CASINO_API")
+    api = api.rstrip("/") if api else None
     dest = ROOT / "web" / "casino.html"
-    dest.write_text(out)
-    pages = ROOT / "docs" / "index.html"
-    pages.parent.mkdir(exist_ok=True)
-    pages.write_text(out)
+    dest.write_text(fill("\n".join(parts), games, api))
     kb = dest.stat().st_size / 1024
-    print(f"  {'Exuma Casino':14} {len(games)} machines, shared purse  ->  web/casino.html ({kb:.0f} KB)")
+    mode = "demo" if api is None else f"live -> {api or 'same origin'}"
+    print(f"  {'Exuma Casino':14} {len(games)} machines, shared purse, {mode}"
+          f"  ->  web/casino.html ({kb:.0f} KB)")
     if kb > 15000:
         raise SystemExit("hub exceeds the 16MB artifact limit")
     return dest
 
 
+def build_public() -> pathlib.Path:
+    """The hosted build, served by the API itself.
+
+    Always live and always same-origin: the server that hosts this page is the
+    server that decides its spins, so there is no origin to configure and no
+    way to deploy a page pointed at the wrong one. The artifact build is a
+    fragment because the artifact host supplies the document around it; this
+    one has to bring its own.
+    """
+    parts, games = hub_page()
+    head, body, script = (fill(part, games, "") for part in parts)
+    doc = ('<!doctype html>\n<html lang="en">\n<head>\n'
+           f'{head}'
+           '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+           f'</head>\n<body>\n{body}\n{script}\n</body>\n</html>\n')
+    dest = ROOT / "server" / "public" / "index.html"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(doc)
+    kb = dest.stat().st_size / 1024
+    print(f"  {'(hosted build)':14} standalone document, same-origin API"
+          f"  ->  server/public/index.html ({kb:.0f} KB)")
+    return dest
+
+
 if __name__ == "__main__":
-    wanted = sys.argv[1:] or list(GAMES) + ["hub"]
+    wanted = sys.argv[1:] or list(GAMES) + ["hub", "serve"]
     for key in wanted:
         if key == "hub":
             build_hub()
+        elif key == "serve":
+            build_public()
         else:
             build(key)

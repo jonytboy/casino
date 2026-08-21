@@ -1,0 +1,7 @@
+# The image needs the server and the built page, nothing else.
+test
+README.md
+.env
+.env.example
+fly.toml
+data

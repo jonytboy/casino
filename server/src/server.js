@@ -7,6 +7,7 @@
  */
 import { createServer } from "node:http";
 import { createHash, randomBytes, timingSafeEqual, createHmac } from "node:crypto";
+import { gzipSync } from "node:zlib";
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -108,9 +109,58 @@ setInterval(() => {
   for (const [k, e] of hits) if (t > e.reset) hits.delete(k);
 }, 60_000).unref?.();
 
+/* ------------------------------------------------------------ the page ---- */
+
+/**
+ * The lobby is one self-contained file with the artwork inlined, so serving it
+ * is: read it once, gzip it once, hand out the same buffer forever. Holding
+ * ~1.4MB resident is cheaper than re-reading it per request, and gzip takes it
+ * to roughly a third of that on the wire.
+ *
+ * It is served from this origin on purpose. Same origin means no CORS to get
+ * wrong, and a page that cannot be deployed pointing at somebody else's API.
+ */
+function loadPage() {
+  const path = join(ROOT, "public", "index.html");
+  if (!existsSync(path)) {
+    console.warn("public/index.html missing — run: python3 build_web.py serve");
+    return null;
+  }
+  const raw = readFileSync(path);
+  const page = {
+    raw,
+    gzip: gzipSync(raw, { level: 9 }),
+    etag: `"${createHash("sha256").update(raw).digest("hex").slice(0, 16)}"`,
+  };
+  console.log(`page ${(raw.length / 1024).toFixed(0)}KB, ${(page.gzip.length / 1024).toFixed(0)}KB gzipped`);
+  return page;
+}
+
+function sendPage(req, res, page) {
+  if (!page) return json(res, 503, { error: "page_not_built" });
+
+  // The URL never changes and the build behind it does, so the page cannot be
+  // cached blind. "no-cache" does not mean "do not store" — it means "store it
+  // but revalidate", which with an ETag turns the common repeat visit into a
+  // 304 and no body at all. That matters here: the artwork is inlined, so the
+  // page is a megabyte, and a returning player should not pay for it twice.
+  res.setHeader("cache-control", "no-cache");
+  res.setHeader("etag", page.etag);
+  if (req.headers["if-none-match"] === page.etag) return res.writeHead(304).end();
+
+  const gz = /\bgzip\b/.test(req.headers["accept-encoding"] ?? "");
+  const body = gz ? page.gzip : page.raw;
+  res.writeHead(200, {
+    "content-type": "text/html; charset=utf-8",
+    "content-length": body.length,
+    ...(gz ? { "content-encoding": "gzip", vary: "accept-encoding" } : {}),
+  });
+  res.end(req.method === "HEAD" ? undefined : body);
+}
+
 /* ---------------------------------------------------------------- routes --- */
 
-export function createApp(db, games) {
+export function createApp(db, games, page = null) {
   const publicGame = (g) => ({
     key: g.key, title: g.title, rtp: g.rtp,
     lines: g.lines, cfg: g.cfg,
@@ -128,6 +178,12 @@ export function createApp(db, games) {
 
     try {
       if (path === "/api/health") return json(res, 200, { ok: true });
+
+      if ((path === "/" || path === "/index.html") && (req.method === "GET" || req.method === "HEAD")) {
+        return sendPage(req, res, page);
+      }
+      // Browsers ask for this unprompted; answering keeps the log honest.
+      if (path === "/favicon.ico") return res.writeHead(204).end();
 
       /* Issue or restore a player. A client with no token gets a new account
          and a welcome balance; a client with one gets its balance back. */
@@ -258,7 +314,7 @@ export function start() {
   mkdirSync(dirname(CONFIG.dbPath), { recursive: true });
   const db = store.open(CONFIG.dbPath);
   const games = loadGames();
-  const server = createServer(createApp(db, games));
+  const server = createServer(createApp(db, games, loadPage()));
   server.listen(CONFIG.port, () => {
     const list = Object.values(games).map((g) => `${g.key} ${(g.rtp * 100).toFixed(2)}%`).join(", ");
     console.log(`exuma-casino api on :${CONFIG.port}  [${list}]`);
