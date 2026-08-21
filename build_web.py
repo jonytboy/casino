@@ -51,7 +51,7 @@ def santa_art(cfg):
     # Symbols the config declares but the game never draws (the inert scatter
     # placeholder) still need something to render.
     blank = ("data:image/svg+xml;base64," + base64.b64encode(
-        b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 155 192"/>').decode())
+        b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 155"/>').decode())
     for s in cfg.symbols:
         art.setdefault(s, blank)
 
