@@ -1,0 +1,13 @@
+{
+  "name": "exuma-casino-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Authoritative slot server: the client renders spins, the server decides them.",
+  "main": "index.js",
+  "engines": { "node": ">=22.5.0" },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test test/*.test.js"
+  }
+}
