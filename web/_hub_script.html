@@ -1,28 +1,109 @@
 <script>
 const GAMES = __GAMES__;
 const STORE = __STORE__;
+/* Where the authoritative server lives. null means there isn't one: the page
+   then plays locally so it still works as a demo, and says so plainly rather
+   than pretending the balance means anything. */
+const API = __API__;
 
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n).toLocaleString("en-GB");
 const BETS = [1, 2, 5, 10, 25, 50];
 const GAP = 4, PADDING = 4, FILLER = 20;
-const START_COINS = 10000, FREE_COINS = 2000, FREE_EVERY = 15 * 60 * 1000;
+const FREE_COINS = 2000, FREE_EVERY = 15 * 60 * 1000;
 
-/* ---------- purse: one balance, shared by every machine ----------
-   localStorage can throw outright (private windows, blocked site data), so every
-   read and write is guarded and the game stays playable with nothing stored. */
-const KEY = "exuma.purse.v1";
-let purse = { coins: START_COINS, lastFree: 0 };
-function loadPurse() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) purse = { ...purse, ...JSON.parse(raw) };
-  } catch (e) { /* start fresh */ }
-}
-function savePurse() {
-  try { localStorage.setItem(KEY, JSON.stringify(purse)); } catch (e) { /* ignore */ }
-}
+/* ---------- the wallet ----------------------------------------------------
+   Two engines behind one interface.
+
+   LocalEngine spins in the browser and keeps the balance in localStorage. That
+   is honest for play money and worthless for anything sold, because a player
+   can edit it — so it is the demo mode, and the page labels itself as such.
+
+   ServerEngine asks the API for every spin and never computes an outcome. The
+   server owns the balance, the strips and the randomness. */
+
+let engine = null, purse = { coins: 0, freeReadyAt: 0 }, AUTO_ROUNDS = 100;
 function paintPurse() { $("purse").textContent = fmt(purse.coins); }
+
+const LOCAL_KEY = "exuma.purse.v1";
+const START_COINS_LOCAL = 10000;
+
+const LocalEngine = {
+  mode: "local",
+  async init() {
+    let stored = { coins: START_COINS_LOCAL, freeReadyAt: 0 };
+    try {
+      const raw = localStorage.getItem(LOCAL_KEY);
+      if (raw) stored = { ...stored, ...JSON.parse(raw) };
+    } catch (e) { /* blocked or unavailable — carry on unsaved */ }
+    purse = stored;
+    return { games: GAMES, bets: BETS };
+  },
+  save() {
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(purse)); } catch (e) {}
+  },
+  async spin(key, betPerLine) {
+    const g = GAMES[key];
+    const stake = betPerLine * g.lines.length;
+    if (purse.coins < stake) return { error: "insufficient_coins" };
+    const window = spinWindow(g);
+    const res = evaluateLocal(g, window, betPerLine);
+    purse.coins += res.win - stake;
+    this.save();
+    return { window, stake, win: res.win, lit: res.lit, coins: purse.coins,
+             scatters: res.scatters, freeSpins: res.freeSpins };
+  },
+  async claimFree() {
+    if (purse.freeReadyAt > Date.now()) return { error: "too_soon", waitMs: purse.freeReadyAt - Date.now() };
+    purse.coins += FREE_COINS;
+    purse.freeReadyAt = Date.now() + FREE_EVERY;
+    this.save();
+    return { coins: purse.coins, freeReadyAt: purse.freeReadyAt };
+  },
+};
+
+const ServerEngine = {
+  mode: "server",
+  token: null,
+  async call(path, opts = {}) {
+    const headers = { "content-type": "application/json", ...(opts.headers || {}) };
+    if (this.token) headers.authorization = `Bearer ${this.token}`;
+    const r = await fetch(API + path, { ...opts, headers });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: body.error || `http_${r.status}`, ...body };
+    return body;
+  },
+  async init() {
+    try { this.token = localStorage.getItem("exuma.token"); } catch (e) {}
+    const s = await this.call("/api/session", { method: "POST" });
+    if (s.error) throw new Error(s.error);
+    if (s.token) {
+      this.token = s.token;
+      try { localStorage.setItem("exuma.token", s.token); } catch (e) {}
+    }
+    purse = { coins: s.coins, freeReadyAt: s.freeReadyAt };
+    // The server is the source of truth for the reels too, so take its copy.
+    const games = {};
+    for (const g of s.games) {
+      const local = GAMES[g.key] || {};
+      games[g.key] = { ...local, key: g.key, cfg: g.cfg, lines: g.lines,
+                       title: g.title, rtp: (g.rtp * 100).toFixed(2) + "%" };
+    }
+    return { games, bets: s.bets || BETS };
+  },
+  async spin(key, betPerLine) {
+    const r = await this.call("/api/spin", {
+      method: "POST", body: JSON.stringify({ game: key, betPerLine }),
+    });
+    if (!r.error) purse.coins = r.coins;
+    return r;
+  },
+  async claimFree() {
+    const r = await this.call("/api/free", { method: "POST" });
+    if (!r.error) { purse.coins = r.coins; purse.freeReadyAt = r.freeReadyAt; }
+    return r;
+  },
+};
 
 /* ---------- audio ---------- */
 const LEVELS = { spin: .32, won: .6, coin: .5, chest: .65, nudge: .4, warning: .45 };
@@ -82,11 +163,20 @@ function winRun(combo) {
   }
   return 0;
 }
-function spinWindow() {
-  return CFG.reels.map(strip => {
+function spinWindow(g) {
+  const cfg = g ? g.cfg : CFG;
+  return cfg.reels.map(strip => {
     const stop = Math.floor(Math.random() * strip.length);
-    return Array.from({ length: CFG.rows }, (_, r) => strip[(stop + r) % strip.length]);
+    return Array.from({ length: cfg.rows }, (_, r) => strip[(stop + r) % strip.length]);
   });
+}
+function evaluateLocal(g, win, betPerLine) {
+  const prevCfg = CFG, prevLines = LINES, prevPaying = PAYING;
+  CFG = g.cfg; LINES = g.lines;
+  PAYING = CFG.symbols.filter(s => s !== CFG.wild && s !== CFG.scatter);
+  const out = evaluate(win, betPerLine);
+  CFG = prevCfg; LINES = prevLines; PAYING = prevPaying;
+  return out;
 }
 function evaluate(win, betPerLine) {
   let total = 0; const lit = [];
@@ -101,8 +191,9 @@ function evaluate(win, betPerLine) {
   }
   const scatters = win.reduce((n, col) => n + col.filter(s => s === CFG.scatter).length, 0);
   const mult = (CFG.scatter_pays || {})[scatters] || 0;
-  return { total: total * betPerLine + mult * betPerLine * LINES.length, lit,
-           scatters, freeSpins: (CFG.scatter_spins || {})[scatters] || 0 };
+  const win_ = total * betPerLine + mult * betPerLine * LINES.length;
+  return { win: win_, total: win_, lit, scatters,
+           freeSpins: (CFG.scatter_spins || {})[scatters] || 0 };
 }
 
 /* ---------- reels ---------- */
@@ -190,30 +281,48 @@ function refresh() {
   paintPurse();
 }
 
-function settle(win, res, stake) {
-  purse.coins += res.total; returned += res.total; savePurse();
-  if (res.total > best) best = res.total;
+function settle(res, stake) {
+  if (res.win > best) best = res.win;
   if (res.freeSpins) play("chest");
-  else if (res.total > 0) { play("won"); setTimeout(() => play("coin"), 260); }
+  else if (res.win > 0) { play("won"); setTimeout(() => play("coin"), 260); }
   highlight(res.lit);
-  $("lastwin").textContent = fmt(res.total);
+  $("lastwin").textContent = fmt(res.win);
   const b = $("banner");
-  if (res.freeSpins) { b.textContent = res.scatters + " Bonus — " + fmt(res.total); b.classList.add("show"); }
-  else if (res.total >= stake * 10) { b.textContent = "Big win — " + fmt(res.total); b.classList.add("show"); }
-  else if (res.total > 0) { b.textContent = "Pays " + fmt(res.total); b.classList.add("show"); }
+  if (res.freeSpins) { b.textContent = res.scatters + " Bonus — " + fmt(res.win); b.classList.add("show"); }
+  else if (res.win >= stake * 10) { b.textContent = "Big win — " + fmt(res.win); b.classList.add("show"); }
+  else if (res.win > 0) { b.textContent = "Pays " + fmt(res.win); b.classList.add("show"); }
   else b.classList.remove("show");
   refresh();
 }
 
-function doSpin() {
+async function doSpin() {
   const bet = BETS[betIdx], stake = bet * LINES.length;
-  if (busy || purse.coins < stake) return;
-  purse.coins -= stake; staked += stake; spins++; savePurse();
-  const win = spinWindow(), res = evaluate(win, bet);
+  if (busy) return;
   busy = true; refresh();
   $("banner").classList.remove("show");
+
+  // The result is decided before the reels move. In server mode that means the
+  // outcome is already committed and the animation is only presentation.
+  const res = await engine.spin(G.key, bet);
+  if (res.error) {
+    busy = false;
+    if (res.error === "insufficient_coins") { play("warning"); showTopup(); }
+    else if (res.error !== "too_soon") notify(res.error);
+    refresh();
+    return;
+  }
+  spins++; staked += res.stake; returned += res.win;
   play("spin", true);
-  animateReels(win).then(() => { stopSound("spin"); busy = false; settle(win, res, stake); });
+  await animateReels(res.window);
+  stopSound("spin");
+  busy = false;
+  settle(res, res.stake);
+}
+
+function notify(code) {
+  const b = $("banner");
+  b.textContent = code === "slow_down" ? "Slow down a moment" : "Connection problem";
+  b.classList.add("show");
 }
 
 /* ---------- views ---------- */
@@ -276,8 +385,8 @@ function buildPacks() {
   const free = document.createElement("button");
   free.className = "pack free";
   packs.appendChild(free);
-  const paint = () => {
-    const wait = purse.lastFree + FREE_EVERY - Date.now();
+  const paintFree = () => {
+    const wait = purse.freeReadyAt - Date.now();
     if (wait > 0) {
       const m = Math.floor(wait / 60000), s = Math.floor(wait % 60000 / 1000);
       free.innerHTML = `<span class="coins">${fmt(FREE_COINS)}</span><span class="price">again in ${m}:${String(s).padStart(2, "0")}</span>`;
@@ -287,12 +396,21 @@ function buildPacks() {
       free.disabled = false;
     }
   };
-  free.addEventListener("click", () => {
-    if (purse.lastFree + FREE_EVERY > Date.now()) return;
-    purse.coins += FREE_COINS; purse.lastFree = Date.now(); savePurse();
-    paintPurse(); play("coin"); paint();
+  free.addEventListener("click", async () => {
+    if (free.disabled) return;
+    free.disabled = true;
+    const r = await engine.claimFree();
+    if (r.error) {
+      // "too_soon" just means our clock ran ahead of the server's; the timer
+      // below will re-enable the button when it is genuinely ready.
+      if (r.waitMs) purse.freeReadyAt = Date.now() + r.waitMs;
+      else if (r.error !== "too_soon") notify(r.error);
+    } else {
+      play("coin");
+    }
+    paintPurse(); paintFree(); refresh();
   });
-  paint(); setInterval(paint, 1000);
+  paintFree(); setInterval(paintFree, 1000);
 
   for (const p of STORE.packs) {
     const el = document.createElement("button");
@@ -320,23 +438,68 @@ $("mute").addEventListener("click", () => {
   $("muteIcon").src = soundOn ? G.icons.on : G.icons.off;
   $("mute").setAttribute("aria-pressed", String(soundOn));
 });
-$("auto").addEventListener("click", () => {
-  const bet = BETS[betIdx], stake = bet * LINES.length;
-  let last = null, lastWin = null;
-  for (let i = 0; i < 100 && purse.coins >= stake; i++) {
-    purse.coins -= stake; staked += stake; spins++;
-    const w = spinWindow(), res = evaluate(w, bet);
-    purse.coins += res.total; returned += res.total;
-    if (res.total > best) best = res.total;
-    last = res; lastWin = w;
+$("auto").addEventListener("click", async () => {
+  if (busy) return;
+  busy = true; refresh();
+  $("banner").classList.remove("show");
+  // Each spin is a separate authorised bet, so they go one at a time. Over the
+  // network that is slower than the old local burst, hence the smaller run.
+  const rounds = AUTO_ROUNDS;
+  const bet = BETS[betIdx];
+  let last = null;
+  for (let i = 0; i < rounds; i++) {
+    const res = await engine.spin(G.key, bet);
+    if (res.error) {
+      if (res.error === "insufficient_coins") play("warning");
+      else notify(res.error);
+      break;
+    }
+    spins++; staked += res.stake; returned += res.win;
+    if (res.win > best) best = res.win;
+    last = res;
+    paint(res.window, res.lit);
+    $("lastwin").textContent = fmt(res.win);
+    paintPurse();
   }
-  savePurse();
-  if (lastWin) { paint(lastWin, last.lit); $("lastwin").textContent = fmt(last.total); play("coin"); }
-  refresh();
+  busy = false;
+  if (last) { if (last.win > 0) play("coin"); settle(last, last.stake); }
+  else refresh();
+  if (purse.coins < bet * LINES.length) showTopup();
 });
 $("lobbyBtn").addEventListener("click", () => { stopSound("spin"); show("lobby"); paintPurse(); });
 $("topupBtn").addEventListener("click", showTopup);
 addEventListener("resize", () => { if (!busy && currentWindow && G) { sizeReels(); paint(currentWindow, []); } });
 
-loadPurse(); paintPurse(); buildLobby(); buildPacks(); show("lobby");
+async function boot() {
+  let info = null;
+  if (API) {
+    try {
+      info = await ServerEngine.init();
+      engine = ServerEngine;
+    } catch (e) {
+      // The API is configured but unreachable. Falling back keeps the page
+      // usable, and the badge stops anyone mistaking it for a real balance.
+      console.warn("server unavailable, playing locally:", e);
+    }
+  }
+  if (!engine) {
+    engine = LocalEngine;
+    info = await LocalEngine.init();
+  }
+  Object.assign(GAMES, info.games);
+  if (info.bets && info.bets.length) {
+    BETS.splice(0, BETS.length, ...info.bets);
+    betIdx = Math.min(betIdx, BETS.length - 1);
+  }
+  AUTO_ROUNDS = engine.mode === "server" ? 25 : 100;
+  $("auto").textContent = "Auto-spin " + AUTO_ROUNDS;
+
+  const badge = document.createElement("span");
+  badge.className = "mode " + engine.mode;
+  badge.textContent = engine.mode === "server" ? "live" : "demo \u00b7 local play";
+  document.querySelector(".brand").after(badge);
+
+  paintPurse(); buildLobby(); buildPacks(); show("lobby");
+}
+boot();
 </script>

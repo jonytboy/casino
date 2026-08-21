@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Exuma Casino</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +25,14 @@
        background:var(--hull);border:1px solid #1D4C57;border-radius:10px;padding:calc(var(--step)*.9) var(--step)}
   .brand{font-family:Cinzel,Georgia,serif;font-weight:800;letter-spacing:.06em;font-size:1.05rem;
          background:linear-gradient(178deg,#FBE7B4 8%,var(--gold) 40%,#9E6B26 100%);
-         -webkit-background-clip:text;background-clip:text;color:transparent;margin-right:auto}
+         -webkit-background-clip:text;background-clip:text;color:transparent}
+  .spacer{margin-right:auto}
+  /* Says whether the balance is real. A demo badge is not decoration: it is
+     the difference between play money and money. */
+  .mode{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.58rem;letter-spacing:.16em;
+        text-transform:uppercase;padding:.2rem .5rem;border-radius:999px;border:1px solid;white-space:nowrap}
+  .mode.server{color:#7BE0A8;border-color:#2C6B4A;background:#0E2A1E}
+  .mode.local{color:var(--tide);border-color:#2A5A66;background:#0C2129}
   .purse{display:flex;align-items:baseline;gap:.5rem}
   .purse .label{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.62rem;letter-spacing:.18em;
                 text-transform:uppercase;color:var(--tide)}

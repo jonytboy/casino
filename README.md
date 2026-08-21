@@ -42,34 +42,41 @@ payline bug described under Santa Slots below.
     python3 build_web.py            # both games
     python3 build_web.py santa      # one game
 
-### Selling coins needs a server, which an artifact is not
+### Two modes: demo and live
 
-The lobby's purse lives in `localStorage`. That is right for play money — private
-to each browser, survives a reload, needs no accounts — and it is exactly wrong
-for anything sold, because a player can edit it. Coins that can be minted for
-free cannot be sold.
+The lobby is built twice from the same source.
 
-The published-page runtime offers no per-player server-side storage: the
-capabilities available are `artifact` (which makes the page's DOM one shared
-document, so every viewer would share a single balance), `downloads`, and `mcp`.
-None of them gives a private, tamper-resistant, per-player wallet.
+With no `CASINO_API` set, the page spins in the browser and keeps the purse in
+`localStorage`. That is right for play money — private to each browser, survives
+a reload, needs no accounts — and exactly wrong for anything sold, because a
+player can edit it. So that build labels itself **demo · local play** in the top
+bar and the coin packs stay inert.
 
-So a paid coin economy needs an ordinary backend: accounts, server-held
-balances, and a webhook from the payment provider that credits coins after a
-completed charge. The provider's hosted checkout (Whop, Stripe, whoever) is the
-easy half; the balance being server-authoritative is the half that matters. Until
-that exists, `build_web.py`'s `STORE["checkoutBase"]` is `None`, the pack buttons
-are inert and say so, and the free top-up carries the game.
+    python3 build_web.py hub                                  # demo build
 
-Worth checking before building any of it: coins that never convert to money or
-prizes are not gambling and are a normal product, but payment providers set their
-own rules on casino-adjacent content, and that is a question for the provider
-rather than an assumption.
+With `CASINO_API` pointing at the server in `server/`, the page never computes an
+outcome. It asks for every spin, the server draws it and moves the balance, and
+the reels only animate a result that is already committed. That build says
+**live**, and if the API is unreachable at load it falls back to local play and
+says so rather than showing a balance that means nothing.
+
+    CASINO_API=https://api.example.com python3 build_web.py hub   # live build
+
+`server/` is the authoritative half: accounts, server-held balances, a ledger
+every movement is written to, and a Whop webhook that credits coins after a
+completed charge. See `server/README.md`. Until a checkout exists,
+`build_web.py`'s `STORE["checkoutBase"]` is `None`, the pack buttons are inert
+and say so, and the free top-up carries the game.
+
+Worth checking before taking money: coins that never convert to money or prizes
+are not gambling and are a normal product, but payment providers set their own
+rules on casino-adjacent content, and that is a question for the provider rather
+than an assumption.
 
 ### Hosting it
 
-`docs/index.html` is the built page, kept byte-identical to
-`web/pirates-slot.html` by `build_web.py`. To serve it from this repo:
+`docs/index.html` is the built lobby, kept byte-identical to
+`web/casino.html` by `build_web.py`. To serve it from this repo:
 **Settings → Pages → Source: Deploy from a branch → `main` / `/docs`**. The URL
 is then `https://jonytboy.github.io/casino/`.
 

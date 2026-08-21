@@ -10,6 +10,7 @@ borrowing another game's artwork — a placeholder should look like one.
 """
 import base64
 import json
+import os
 import pathlib
 import sys
 
@@ -176,6 +177,8 @@ def build_hub() -> pathlib.Path:
         top = max((max(t.values()) for t in cfg.paytable.values() if t), default=0)
         preview = sorted(cfg.paytable, key=lambda s: -max(cfg.paytable[s].values()))[:4]
         games[key] = {
+            # The engine names games by key when it asks the server for a spin.
+            "key": key,
             "title": spec["title"],
             "cfg": {k: getattr(cfg, k) for k in
                     ("symbols", "wild", "scatter", "rows", "paytable",
@@ -192,7 +195,12 @@ def build_hub() -> pathlib.Path:
 
     parts = [(ROOT / "web" / f"_hub_{n}.html").read_text() for n in ("head", "body", "script")]
     out = "\n".join(parts)
-    out = out.replace("__GAMES__", json.dumps(games)).replace("__STORE__", json.dumps(STORE))
+    # Set CASINO_API to the deployed server's origin to build the live client;
+    # with it unset the page plays locally and labels itself a demo.
+    api = os.environ.get("CASINO_API") or None
+    out = (out.replace("__GAMES__", json.dumps(games))
+              .replace("__STORE__", json.dumps(STORE))
+              .replace("__API__", json.dumps(api)))
     dest = ROOT / "web" / "casino.html"
     dest.write_text(out)
     pages = ROOT / "docs" / "index.html"
