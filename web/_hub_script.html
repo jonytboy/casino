@@ -1,0 +1,342 @@
+<script>
+const GAMES = __GAMES__;
+const STORE = __STORE__;
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString("en-GB");
+const BETS = [1, 2, 5, 10, 25, 50];
+const GAP = 4, PADDING = 4, FILLER = 20;
+const START_COINS = 10000, FREE_COINS = 2000, FREE_EVERY = 15 * 60 * 1000;
+
+/* ---------- purse: one balance, shared by every machine ----------
+   localStorage can throw outright (private windows, blocked site data), so every
+   read and write is guarded and the game stays playable with nothing stored. */
+const KEY = "exuma.purse.v1";
+let purse = { coins: START_COINS, lastFree: 0 };
+function loadPurse() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) purse = { ...purse, ...JSON.parse(raw) };
+  } catch (e) { /* start fresh */ }
+}
+function savePurse() {
+  try { localStorage.setItem(KEY, JSON.stringify(purse)); } catch (e) { /* ignore */ }
+}
+function paintPurse() { $("purse").textContent = fmt(purse.coins); }
+
+/* ---------- audio ---------- */
+const LEVELS = { spin: .32, won: .6, coin: .5, chest: .65, nudge: .4, warning: .45 };
+let AUDIO = {}, soundOn = true, HAS_SOUND = false;
+function loadAudio(game) {
+  AUDIO = {};
+  HAS_SOUND = Object.keys(game.sfx).length > 0;
+  for (const [name, src] of Object.entries(game.sfx)) {
+    const a = new Audio(src);
+    a.preload = "auto"; a.volume = LEVELS[name] ?? .5;
+    AUDIO[name] = a;
+  }
+}
+function play(name, loop) {
+  if (!soundOn || !AUDIO[name]) return;
+  const base = AUDIO[name];
+  if (loop) { base.loop = true; base.currentTime = 0; base.play().catch(() => {}); return; }
+  const one = base.cloneNode(); one.volume = base.volume; one.play().catch(() => {});
+}
+function stopSound(name) {
+  const a = AUDIO[name];
+  if (a) { a.pause(); a.loop = false; a.currentTime = 0; }
+}
+
+/* ---------- maths: identical to the verified Python model ---------- */
+let G = null, CFG = null, LINES = null, ART = null, PAYING = null;
+
+function lineWin(combo) {
+  if (CFG.rule === "leftmost_nonwild") {
+    let value = CFG.wild;
+    for (const c of combo) { if (c !== CFG.wild) { value = c; break; } }
+    let run = 0;
+    for (const c of combo) { if (c === value || c === CFG.wild) run++; else break; }
+    return run >= 2 ? ((CFG.paytable[value] || {})[run] || 0) : 0;
+  }
+  let best = 0;
+  for (const sym of PAYING) {
+    let run = 0;
+    for (const c of combo) { if (c === sym || c === CFG.wild) run++; else break; }
+    if (run >= 2) best = Math.max(best, (CFG.paytable[sym] || {})[run] || 0);
+  }
+  return best;
+}
+function winRun(combo) {
+  if (CFG.rule === "leftmost_nonwild") {
+    let value = CFG.wild;
+    for (const c of combo) { if (c !== CFG.wild) { value = c; break; } }
+    let run = 0;
+    for (const c of combo) { if (c === value || c === CFG.wild) run++; else break; }
+    return run;
+  }
+  const pay = lineWin(combo);
+  for (const sym of PAYING) {
+    let run = 0;
+    for (const c of combo) { if (c === sym || c === CFG.wild) run++; else break; }
+    if (run >= 2 && ((CFG.paytable[sym] || {})[run] || 0) === pay) return run;
+  }
+  return 0;
+}
+function spinWindow() {
+  return CFG.reels.map(strip => {
+    const stop = Math.floor(Math.random() * strip.length);
+    return Array.from({ length: CFG.rows }, (_, r) => strip[(stop + r) % strip.length]);
+  });
+}
+function evaluate(win, betPerLine) {
+  let total = 0; const lit = [];
+  for (const line of LINES) {
+    const combo = line.map((row, reel) => win[reel][row]);
+    const pay = lineWin(combo);
+    if (pay > 0) {
+      total += pay;
+      const run = winRun(combo);
+      for (let reel = 0; reel < run; reel++) lit.push([reel, line[reel]]);
+    }
+  }
+  const scatters = win.reduce((n, col) => n + col.filter(s => s === CFG.scatter).length, 0);
+  const mult = (CFG.scatter_pays || {})[scatters] || 0;
+  return { total: total * betPerLine + mult * betPerLine * LINES.length, lit,
+           scatters, freeSpins: (CFG.scatter_spins || {})[scatters] || 0 };
+}
+
+/* ---------- reels ---------- */
+let CELL = 60, STEP = 64, currentWindow = null;
+const reelEls = [];
+function buildReels() {
+  $("reels").innerHTML = ""; reelEls.length = 0;
+  for (let r = 0; r < CFG.reels.length; r++) {
+    const reel = document.createElement("div"); reel.className = "reel";
+    const cells = document.createElement("div"); cells.className = "cells";
+    reel.appendChild(cells); $("reels").appendChild(reel);
+    reelEls.push({ reel, cells });
+  }
+}
+function sizeReels() {
+  if (!reelEls.length) return;
+  CELL = Math.max(26, Math.round(reelEls[0].reel.clientWidth - PADDING * 2));
+  STEP = CELL + GAP;
+  document.documentElement.style.setProperty("--cell", CELL + "px");
+}
+function makeCell(sym) {
+  const cell = document.createElement("div"); cell.className = "cell";
+  const img = document.createElement("img"); img.src = ART[sym]; img.alt = sym;
+  cell.appendChild(img); return cell;
+}
+function fillColumn(i, result, filler) {
+  const { cells } = reelEls[i], strip = CFG.reels[i];
+  cells.innerHTML = "";
+  result.forEach(s => cells.appendChild(makeCell(s)));
+  for (let k = 0; k < filler; k++) cells.appendChild(makeCell(strip[Math.floor(Math.random() * strip.length)]));
+  return filler;
+}
+function highlight(lit) {
+  const key = new Set((lit || []).map(([a, b]) => a + ":" + b));
+  reelEls.forEach(({ cells }, reel) => {
+    for (let row = 0; row < CFG.rows; row++) {
+      const c = cells.children[row];
+      if (c) c.classList.toggle("lit", key.has(reel + ":" + row));
+    }
+  });
+}
+function paint(win, lit) {
+  currentWindow = win;
+  win.forEach((col, reel) => { fillColumn(reel, col, 0); reelEls[reel].cells.style.transform = "translateY(0px)"; });
+  highlight(lit);
+}
+function animateReels(win) {
+  currentWindow = win;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { paint(win, []); return Promise.resolve(); }
+  return Promise.all(win.map((col, reel) => {
+    const { cells } = reelEls[reel];
+    const filler = fillColumn(reel, col, FILLER);
+    const from = -(filler * STEP);
+    cells.style.transform = `translateY(${from}px)`;
+    cells.classList.add("fast");
+    const anim = cells.animate(
+      [{ transform: `translateY(${from}px)` }, { transform: "translateY(0px)" }],
+      { duration: 620 + reel * 170, easing: "cubic-bezier(.17,.67,.21,1)", fill: "forwards" });
+    setTimeout(() => cells.classList.remove("fast"), 420 + reel * 170);
+    return anim.finished.then(() => { cells.style.transform = "translateY(0px)"; });
+  }));
+}
+
+/* ---------- session ---------- */
+let betIdx = 1, spins = 0, staked = 0, returned = 0, best = 0, busy = false, warned = false;
+
+function refresh() {
+  const bet = BETS[betIdx], stake = bet * LINES.length;
+  $("bet").textContent = bet;
+  $("stake").textContent = fmt(stake);
+  $("lineCount").textContent = LINES.length;
+  $("spins").textContent = fmt(spins);
+  $("staked").textContent = fmt(staked);
+  $("returned").textContent = fmt(returned);
+  $("best").textContent = fmt(best);
+  const rtp = staked ? returned / staked * 100 : null;
+  $("liveRtp").textContent = rtp === null ? "—" : rtp.toFixed(2) + "%";
+  const broke = purse.coins < stake;
+  if (broke && !warned) { warned = true; play("warning"); showTopup(); }
+  if (!broke) warned = false;
+  $("spin").disabled = busy || broke;
+  $("auto").disabled = busy || broke;
+  $("down").disabled = busy || betIdx === 0;
+  $("up").disabled = busy || betIdx === BETS.length - 1;
+  paintPurse();
+}
+
+function settle(win, res, stake) {
+  purse.coins += res.total; returned += res.total; savePurse();
+  if (res.total > best) best = res.total;
+  if (res.freeSpins) play("chest");
+  else if (res.total > 0) { play("won"); setTimeout(() => play("coin"), 260); }
+  highlight(res.lit);
+  $("lastwin").textContent = fmt(res.total);
+  const b = $("banner");
+  if (res.freeSpins) { b.textContent = res.scatters + " Bonus — " + fmt(res.total); b.classList.add("show"); }
+  else if (res.total >= stake * 10) { b.textContent = "Big win — " + fmt(res.total); b.classList.add("show"); }
+  else if (res.total > 0) { b.textContent = "Pays " + fmt(res.total); b.classList.add("show"); }
+  else b.classList.remove("show");
+  refresh();
+}
+
+function doSpin() {
+  const bet = BETS[betIdx], stake = bet * LINES.length;
+  if (busy || purse.coins < stake) return;
+  purse.coins -= stake; staked += stake; spins++; savePurse();
+  const win = spinWindow(), res = evaluate(win, bet);
+  busy = true; refresh();
+  $("banner").classList.remove("show");
+  play("spin", true);
+  animateReels(win).then(() => { stopSound("spin"); busy = false; settle(win, res, stake); });
+}
+
+/* ---------- views ---------- */
+function show(view) {
+  for (const id of ["lobby", "machine", "topup"]) $(id).classList.toggle("hidden", id !== view);
+  $("lobbyBtn").classList.toggle("hidden", view === "lobby");
+}
+function showTopup() { show("topup"); }
+
+function openGame(key) {
+  G = GAMES[key];
+  CFG = G.cfg; LINES = G.lines; ART = G.art;
+  PAYING = CFG.symbols.filter(s => s !== CFG.wild && s !== CFG.scatter);
+  loadAudio(G);
+  soundOn = HAS_SOUND;
+  spins = staked = returned = best = 0; busy = false; warned = false;
+  $("assayTitle").textContent = G.title;
+  $("assayNote").textContent = "Return computed exactly over all " + G.windows + " reel positions — not sampled.";
+  $("verified").textContent = G.rtp;
+  $("rules").textContent = G.rules;
+  $("lastwin").textContent = "0";
+  $("banner").classList.remove("show");
+  $("mute").hidden = !HAS_SOUND;
+  if (HAS_SOUND) $("muteIcon").src = G.icons.on;
+  buildReels();
+  show("machine");
+  requestAnimationFrame(() => { sizeReels(); paint(spinWindow(), []); refresh(); buildPaytable(); });
+}
+
+function buildPaytable() {
+  const counts = [...new Set(PAYING.flatMap(s => Object.keys(CFG.paytable[s] || {}).map(Number)))].sort((a, b) => a - b);
+  const rows = ["<tr><th>Symbol</th>" + counts.map(n => `<th>${n}</th>`).join("") + "</tr>"];
+  for (const sym of PAYING) {
+    const t = CFG.paytable[sym] || {};
+    if (!Object.keys(t).length) continue;
+    rows.push(`<tr><td><img src="${ART[sym]}" alt=""> ${G.names[sym] || sym}</td>` +
+              counts.map(n => `<td>${t[n] ?? "–"}</td>`).join("") + "</tr>");
+  }
+  $("paytable").innerHTML = rows.join("");
+}
+
+function buildLobby() {
+  const tiles = $("tiles"); tiles.innerHTML = "";
+  for (const [key, g] of Object.entries(GAMES)) {
+    const btn = document.createElement("button");
+    btn.className = "tile";
+    const peek = g.preview.map(s => `<img src="${g.art[s]}" alt="">`).join("");
+    btn.innerHTML = `<div class="inner"><h2>${g.title}</h2><div class="strip">${peek}</div>
+      <dl><dt>Verified return</dt><dd>${g.rtp}</dd>
+      <dt>Paylines</dt><dd>${g.lines.length}</dd>
+      <dt>Top award</dt><dd>${g.topAward}</dd></dl></div>`;
+    btn.addEventListener("click", () => openGame(key));
+    tiles.appendChild(btn);
+  }
+}
+
+/* ---------- top up ---------- */
+function buildPacks() {
+  const packs = $("packs"); packs.innerHTML = "";
+  const free = document.createElement("button");
+  free.className = "pack free";
+  packs.appendChild(free);
+  const paint = () => {
+    const wait = purse.lastFree + FREE_EVERY - Date.now();
+    if (wait > 0) {
+      const m = Math.floor(wait / 60000), s = Math.floor(wait % 60000 / 1000);
+      free.innerHTML = `<span class="coins">${fmt(FREE_COINS)}</span><span class="price">again in ${m}:${String(s).padStart(2, "0")}</span>`;
+      free.disabled = true;
+    } else {
+      free.innerHTML = `<span class="coins">${fmt(FREE_COINS)}</span><span class="price">free &middot; collect now</span>`;
+      free.disabled = false;
+    }
+  };
+  free.addEventListener("click", () => {
+    if (purse.lastFree + FREE_EVERY > Date.now()) return;
+    purse.coins += FREE_COINS; purse.lastFree = Date.now(); savePurse();
+    paintPurse(); play("coin"); paint();
+  });
+  paint(); setInterval(paint, 1000);
+
+  for (const p of STORE.packs) {
+    const el = document.createElement("button");
+    el.className = "pack";
+    el.innerHTML = `<span class="coins">${fmt(p.coins)}</span><span class="price">${p.price}</span>`;
+    if (STORE.checkoutBase) {
+      el.addEventListener("click", () => window.open(STORE.checkoutBase + p.id, "_blank", "noopener"));
+    } else {
+      el.disabled = true;
+    }
+    packs.appendChild(el);
+  }
+  $("storeNote").textContent = STORE.checkoutBase
+    ? "Purchases open in a new tab and are handled by the store."
+    : "Coin packs are not on sale yet — the free top-up above keeps you playing.";
+}
+
+/* ---------- wiring ---------- */
+$("spin").addEventListener("click", doSpin);
+$("down").addEventListener("click", () => { if (betIdx > 0) { betIdx--; play("nudge"); } refresh(); });
+$("up").addEventListener("click", () => { if (betIdx < BETS.length - 1) { betIdx++; play("nudge"); } refresh(); });
+$("mute").addEventListener("click", () => {
+  soundOn = !soundOn;
+  if (!soundOn) stopSound("spin"); else play("nudge");
+  $("muteIcon").src = soundOn ? G.icons.on : G.icons.off;
+  $("mute").setAttribute("aria-pressed", String(soundOn));
+});
+$("auto").addEventListener("click", () => {
+  const bet = BETS[betIdx], stake = bet * LINES.length;
+  let last = null, lastWin = null;
+  for (let i = 0; i < 100 && purse.coins >= stake; i++) {
+    purse.coins -= stake; staked += stake; spins++;
+    const w = spinWindow(), res = evaluate(w, bet);
+    purse.coins += res.total; returned += res.total;
+    if (res.total > best) best = res.total;
+    last = res; lastWin = w;
+  }
+  savePurse();
+  if (lastWin) { paint(lastWin, last.lit); $("lastwin").textContent = fmt(last.total); play("coin"); }
+  refresh();
+});
+$("lobbyBtn").addEventListener("click", () => { stopSound("spin"); show("lobby"); paintPurse(); });
+$("topupBtn").addEventListener("click", showTopup);
+addEventListener("resize", () => { if (!busy && currentWindow && G) { sizeReels(); paint(currentWindow, []); } });
+
+loadPurse(); paintPurse(); buildLobby(); buildPacks(); show("lobby");
+</script>

@@ -23,6 +23,9 @@ path (Construct 3 imports Construct 2 projects).
 
 ## Play it
 
+- **Exuma Casino (the lobby):** https://claude.ai/code/artifact/9ba2a514-793f-4cc4-9f83-606d979d9306
+  Both machines, one shared purse. This is the launch build; `docs/index.html` is
+  the same file, ready for any static host.
 - **Pirate Slots:** https://claude.ai/code/artifact/24c0fb37-7050-48bd-81e6-26e9f1e64519
 - **Santa Slots:** https://claude.ai/code/artifact/aa8db3cb-2e88-4491-8d7b-e9b5e95348f2
   (original artwork and sound)
@@ -38,6 +41,30 @@ payline bug described under Santa Slots below.
 
     python3 build_web.py            # both games
     python3 build_web.py santa      # one game
+
+### Selling coins needs a server, which an artifact is not
+
+The lobby's purse lives in `localStorage`. That is right for play money — private
+to each browser, survives a reload, needs no accounts — and it is exactly wrong
+for anything sold, because a player can edit it. Coins that can be minted for
+free cannot be sold.
+
+The published-page runtime offers no per-player server-side storage: the
+capabilities available are `artifact` (which makes the page's DOM one shared
+document, so every viewer would share a single balance), `downloads`, and `mcp`.
+None of them gives a private, tamper-resistant, per-player wallet.
+
+So a paid coin economy needs an ordinary backend: accounts, server-held
+balances, and a webhook from the payment provider that credits coins after a
+completed charge. The provider's hosted checkout (Whop, Stripe, whoever) is the
+easy half; the balance being server-authoritative is the half that matters. Until
+that exists, `build_web.py`'s `STORE["checkoutBase"]` is `None`, the pack buttons
+are inert and say so, and the free top-up carries the game.
+
+Worth checking before building any of it: coins that never convert to money or
+prizes are not gambling and are a normal product, but payment providers set their
+own rules on casino-adjacent content, and that is a question for the provider
+rather than an assumption.
 
 ### Hosting it
 

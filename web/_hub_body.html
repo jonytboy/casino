@@ -1,0 +1,95 @@
+<div class="shell">
+  <div class="bar">
+    <span class="brand">Exuma Casino</span>
+    <div class="purse">
+      <span class="label">Coins</span>
+      <span class="amount" id="purse">0</span>
+    </div>
+    <button id="topupBtn">Get coins</button>
+    <button id="lobbyBtn" class="hidden">&larr; Lobby</button>
+  </div>
+
+  <!-- ---------------- lobby ---------------- -->
+  <section id="lobby">
+    <p class="lead">Two machines, one purse. Both run on reel strips solved to a verified
+      94.00% return &mdash; the figure is computed exactly over every reel position, not
+      estimated, and each machine reports its own running return as you play.</p>
+    <div class="lobby" id="tiles"></div>
+  </section>
+
+  <!-- ---------------- machine ---------------- -->
+  <section id="machine" class="hidden">
+    <div style="display:flex;flex-direction:column;gap:calc(var(--step)*1.6)">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:calc(var(--step)*1.6);align-items:start"
+           id="deck">
+        <div>
+          <div class="cabinet">
+            <div class="screen">
+              <div class="reels" id="reels"></div>
+              <div class="banner" id="banner"></div>
+            </div>
+          </div>
+          <div class="controls">
+            <div class="field">
+              <span class="label">Bet per line</span>
+              <div class="stepper">
+                <button id="down" aria-label="Lower bet">&minus;</button>
+                <span class="value" id="bet" style="min-width:2.5ch;text-align:center">2</span>
+                <button id="up" aria-label="Raise bet">+</button>
+              </div>
+            </div>
+            <div class="field">
+              <span class="label">Total stake &middot; <span id="lineCount">20</span> lines</span>
+              <span class="value" id="stake">40</span>
+            </div>
+            <div class="field">
+              <span class="label">Last win</span>
+              <span class="value win" id="lastwin">0</span>
+            </div>
+            <button class="mute" id="mute" aria-pressed="true" aria-label="Mute sound"><img id="muteIcon" src="" alt=""></button>
+            <button class="spin" id="spin">Spin</button>
+          </div>
+        </div>
+
+        <aside class="panel">
+          <h2 id="assayTitle">Assay</h2>
+          <p id="assayNote"></p>
+          <div style="display:flex;flex-direction:column;gap:.4rem">
+            <div class="row"><span>Verified RTP</span><span id="verified" style="color:var(--gold);font-size:1.05rem;font-weight:600">94.00%</span></div>
+            <div class="row"><span>Your RTP</span><span id="liveRtp" style="color:var(--gold);font-size:1.05rem;font-weight:600">&mdash;</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.4rem">
+            <div class="row"><span>Spins</span><span id="spins">0</span></div>
+            <div class="row"><span>Staked</span><span id="staked">0</span></div>
+            <div class="row"><span>Returned</span><span id="returned">0</span></div>
+            <div class="row"><span>Best win</span><span id="best">0</span></div>
+          </div>
+          <button id="auto">Auto-spin 100</button>
+        </aside>
+      </div>
+
+      <div class="panel">
+        <h2>Paytable &middot; per line, &times; bet per line</h2>
+        <table id="paytable"></table>
+        <p id="rules"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- top up ---------------- -->
+  <section id="topup" class="hidden">
+    <div class="panel">
+      <h2>Get coins</h2>
+      <p>Coins are for play only. They buy nothing outside these machines, cannot be
+        cashed out, exchanged or won as a prize, and carry no value of any kind.</p>
+      <div class="packs" id="packs"></div>
+      <p id="storeNote"></p>
+    </div>
+  </section>
+
+  <footer>
+    Play money only &mdash; no cash, no prizes, no cash-out. Intended for adults.
+    Reel strips and paytables are the same data a Python model verifies exactly,
+    so what these machines pay is what was measured.
+  </footer>
+</div>

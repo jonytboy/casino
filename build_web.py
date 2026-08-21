@@ -138,7 +138,77 @@ def build(key: str) -> pathlib.Path:
     return dest
 
 
+# Friendly names for the paytable, since the Construct project only ever knew
+# its symbols by index.
+SANTA_NAMES = {
+    "card0": "Wild", "card1": "Stocking", "card2": "Stocking (red)",
+    "card3": "Snow globe", "card4": "Snow globe (gold)", "card5": "Snowman",
+    "card6": "Snowman (green)", "card7": "Bauble", "card8": "Candy cane",
+    "card9": "Present", "card10": "Reindeer", "card11": "Sleigh",
+    "card12": "Tree", "card13": "Bonus",
+}
+
+# Coin packs. No checkout is wired: selling coins needs a server that owns the
+# balance, and a page whose wallet lives in localStorage cannot sell anything a
+# player could not simply mint. Set checkoutBase once a real store exists.
+STORE = {
+    "checkoutBase": None,
+    "packs": [
+        {"id": "coins-10k", "coins": 10_000, "price": "\u00a30.99"},
+        {"id": "coins-60k", "coins": 60_000, "price": "\u00a34.99"},
+        {"id": "coins-200k", "coins": 200_000, "price": "\u00a39.99"},
+    ],
+}
+
+
+def build_hub() -> pathlib.Path:
+    """Assemble both machines into one lobby with a shared purse."""
+    games = {}
+    for key in ("santa", "pirates"):
+        spec = GAMES[key]
+        cfg = GameConfig.load(ROOT / spec["config"])
+        lines = spec["lines"]
+        art, sfx, icons = spec["art"](cfg)
+        res = evaluate(cfg, lines=lines)
+        windows = 1
+        for strip in cfg.reels:
+            windows *= len(strip)
+        top = max((max(t.values()) for t in cfg.paytable.values() if t), default=0)
+        preview = sorted(cfg.paytable, key=lambda s: -max(cfg.paytable[s].values()))[:4]
+        games[key] = {
+            "title": spec["title"],
+            "cfg": {k: getattr(cfg, k) for k in
+                    ("symbols", "wild", "scatter", "rows", "paytable",
+                     "scatter_pays", "scatter_spins", "reels", "rule")},
+            "lines": [list(l) for l in lines],
+            "art": art, "sfx": sfx, "icons": icons,
+            "rtp": f"{res['rtp_total'] * 100:.2f}%",
+            "windows": f"{windows:,}",
+            "topAward": f"{top:,.0f}x line bet",
+            "rules": spec["rules"],
+            "names": SANTA_NAMES if key == "santa" else {},
+            "preview": preview,
+        }
+
+    parts = [(ROOT / "web" / f"_hub_{n}.html").read_text() for n in ("head", "body", "script")]
+    out = "\n".join(parts)
+    out = out.replace("__GAMES__", json.dumps(games)).replace("__STORE__", json.dumps(STORE))
+    dest = ROOT / "web" / "casino.html"
+    dest.write_text(out)
+    pages = ROOT / "docs" / "index.html"
+    pages.parent.mkdir(exist_ok=True)
+    pages.write_text(out)
+    kb = dest.stat().st_size / 1024
+    print(f"  {'Exuma Casino':14} {len(games)} machines, shared purse  ->  web/casino.html ({kb:.0f} KB)")
+    if kb > 15000:
+        raise SystemExit("hub exceeds the 16MB artifact limit")
+    return dest
+
+
 if __name__ == "__main__":
-    wanted = sys.argv[1:] or list(GAMES)
+    wanted = sys.argv[1:] or list(GAMES) + ["hub"]
     for key in wanted:
-        build(key)
+        if key == "hub":
+            build_hub()
+        else:
+            build(key)
