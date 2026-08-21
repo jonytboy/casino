@@ -141,6 +141,32 @@ Rebuild the page whenever the maths or the artwork changes:
     python3 build_web.py static                       # static host
     server/deploy/deploy.sh root@casinocarib.com   # server host
 
+### Deploying without a terminal
+
+Both paths above assume a shell. Neither has to.
+
+**No server at all.** `dist/index.html` is one file. Drag it onto Netlify Drop
+or a Cloudflare Pages project in a browser and it is live. Nothing to install,
+nothing to pay for, nothing to keep running.
+
+**A server, from the Hetzner web console.** `server/deploy/cloud-init.yaml`
+builds the whole box on first boot. Create a server (Ubuntu 24.04), paste the
+file into "Cloud config" under Additional features, create. It installs Docker,
+clones this repo, works out its own hostname, starts the stack over HTTPS and
+installs the nightly backup cron.
+
+It names itself after its own public IP via sslip.io, so there is a real
+certificate and a working URL before any domain exists. Set `DOMAIN` in the
+script to use a real name instead — its A record has to point at the box first,
+because Caddy cannot get a certificate for a name that does not resolve.
+
+Everything lands in `/var/log/casino-bootstrap.log`. If it needs looking at,
+Hetzner's console has a browser terminal — still nobody's own terminal.
+
+The script is idempotent and never touches `/opt/casino/data`, so re-running it
+updates the deploy and leaves the balances alone. `.env` is written once and
+then left, so an edited secret survives the next boot.
+
 ### Backing up the balances
 
 The volume is the only thing here that cannot be regenerated. `build_web.py`

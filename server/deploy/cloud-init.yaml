@@ -1,0 +1,90 @@
+#cloud-config
+# Build the whole box from the Hetzner web console — no terminal.
+#
+# Create a server (Ubuntu 24.04), open "Cloud config" under Additional
+# features, paste this file in, create. The machine installs Docker, fetches
+# the repo, works out its own hostname and starts serving over HTTPS.
+#
+# It gives itself an sslip.io name derived from its own public IP, so there is
+# a real certificate and a working URL before any domain exists. To use a real
+# domain instead, point the A record at the box first and set DOMAIN below.
+#
+# Everything is logged to /var/log/casino-bootstrap.log. If it goes wrong,
+# Hetzner's console has a browser terminal — still no terminal of your own.
+
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - curl
+
+write_files:
+  - path: /opt/casino/bootstrap.sh
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Idempotent: safe to re-run, and it never touches /opt/casino/data.
+      set -euo pipefail
+      exec > >(tee -a /var/log/casino-bootstrap.log) 2>&1
+      echo "=== casino bootstrap $(date -Is)"
+
+      # A public repo needs no credentials. For a private one, use a URL with a
+      # fine-grained token: https://<token>@github.com/jonytboy/casino.git
+      REPO_URL="${REPO_URL:-https://github.com/jonytboy/casino.git}"
+
+      # Leave DOMAIN empty to be named after this machine's own IP. Set it to a
+      # hostname whose A record already points here to use that instead —
+      # Caddy cannot get a certificate for a name that does not resolve.
+      DOMAIN="${DOMAIN:-}"
+
+      if [ -z "$DOMAIN" ]; then
+        IP="$(curl -sf --max-time 10 http://169.254.169.254/hetzner/v1/metadata/public-ipv4 || true)"
+        [ -n "$IP" ] || IP="$(hostname -I | awk '{print $1}')"
+        # sslip.io resolves any IP written into the hostname, so this is a real
+        # name that really resolves here, which is all Let's Encrypt asks.
+        DOMAIN="${IP//./-}.sslip.io"
+      fi
+      echo "domain: $DOMAIN"
+
+      install -d -m 0755 /opt/casino /opt/casino/data
+      if [ -d /opt/casino/src/.git ]; then
+        git -C /opt/casino/src fetch --depth 1 origin main
+        git -C /opt/casino/src reset --hard origin/main
+      else
+        git clone --depth 1 "$REPO_URL" /opt/casino/src
+      fi
+
+      # Written once. A re-run keeps the existing file, so an edited secret or
+      # a switched domain survives the next boot.
+      if [ ! -f /opt/casino/.env ]; then
+        cat > /opt/casino/.env <<ENV
+      DOMAIN=$DOMAIN
+      ALLOW_ORIGIN=https://$DOMAIN
+      SRC_DIR=/opt/casino/src/server
+      DATA_DIR=/opt/casino/data
+      STARTING_COINS=10000
+      FREE_COINS=2000
+      FREE_COOLDOWN_MS=900000
+      WHOP_WEBHOOK_SECRET=
+      ENV
+        chmod 600 /opt/casino/.env
+      fi
+
+      cp /opt/casino/src/server/deploy/docker-compose.yml /opt/casino/
+      cp /opt/casino/src/server/deploy/Caddyfile /opt/casino/
+
+      cd /opt/casino
+      docker compose up -d --build
+
+      # Nightly snapshot of the balances, 14 deep, into ./data/backups.
+      cat > /etc/cron.d/casino-backup <<'CRON'
+      0 3 * * * root cd /opt/casino && docker compose exec -T api node scripts/backup.mjs /data/backups 14 >> /var/log/casino-backup.log 2>&1
+      CRON
+      chmod 0644 /etc/cron.d/casino-backup
+
+      echo "=== up at https://$DOMAIN"
+
+runcmd:
+  - systemctl enable --now docker
+  - bash /opt/casino/bootstrap.sh
